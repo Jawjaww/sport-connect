@@ -1,0 +1,68 @@
+# OSX
+.DS_Store
+
+# Expo
+.expo/
+dist/
+web-build/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# Node
+node_modules/
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# TypeScript
+*.tsbuildinfo
+
+# Android/IntelliJ
+build/
+.idea
+.gradle
+local.properties
+*.iml
+*.hprof
+.cxx/
+*.keystore
+!debug.keystore
+
+# iOS
+ios/Pods/
+*.ipa
+*.xcuserstate
+xcuserdata/
+
+# Firebase
+google-services.json
+GoogleService-Info.plist
+
+# Testing
+coverage/
+
+# VSCode
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+# Temporary files
+*.log
+*.tmp
+*.temp
+
+# Build files
+*.apk
+*.aab
+*.app

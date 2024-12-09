@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "SportConnect",
+    "slug": "sport-connect",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./src/assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "sportconnect",
+    "splash": {
+      "image": "./src/assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.sportconnect.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./src/assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.sportconnect.app"
+    },
+    "plugins": [],
+    "experiments": {
+      "tsconfigPaths": true
+    },
+    "newArchEnabled": true
+  }
+}
