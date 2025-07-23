@@ -3,12 +3,13 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
-import type { RootStackParamList } from '../types/navigation';
+import type { RootStackParamList, RootStackScreenProps } from '../types/navigationTypes';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 // Screens
-import HomeScreen from '../screens/Home';
+import HomeScreen from '../screens/Home/HomeScreen';
 import TeamScreen from '../screens/Team/TeamScreen';
 import PlayerProfileScreen from '../screens/Player/PlayerProfileScreen';
 import CreateTeamScreen from '../screens/Team/CreateTeamScreen';
@@ -23,14 +24,32 @@ import TournamentDetailsScreen from '../screens/Tournament/TournamentDetailsScre
 import TeamCodeDetailScreen from '../screens/Team/TeamCodeDetailScreen';
 import ProfileScreen from '../screens/Profile/ProfileScreen';
 
+// Define props for each screen
+export type HomeScreenProps = NativeStackScreenProps<RootStackParamList, 'Home'>;
+export type TeamScreenProps = NativeStackScreenProps<RootStackParamList, 'TeamMain'>;
+export type PlayerProfileScreenProps = NativeStackScreenProps<RootStackParamList, 'PlayerProfile'>;
+export type CreateTeamScreenProps = NativeStackScreenProps<RootStackParamList, 'CreateTeam'>;
+export type JoinTeamScreenProps = NativeStackScreenProps<RootStackParamList, 'JoinTeam'>;
+export type TeamMembersScreenProps = NativeStackScreenProps<RootStackParamList, 'TeamMembers'>;
+export type EditTeamScreenProps = NativeStackScreenProps<RootStackParamList, 'EditTeam'>;
+export type EditPlayerScreenProps = NativeStackScreenProps<RootStackParamList, 'EditPlayer'>;
+export type ManagedTeamsScreenProps = NativeStackScreenProps<RootStackParamList, 'ManagedTeams'>;
+export type MatchDetailsScreenProps = NativeStackScreenProps<RootStackParamList, 'MatchDetails'>;
+export type TeamCodeDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'TeamCodeDetail'>;
+export type ProfileScreenProps = NativeStackScreenProps<RootStackParamList, 'Profile'>;
+export type TournamentDetailsScreenProps = NativeStackScreenProps<RootStackParamList, 'TournamentDetails'>;
+
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 const AppNavigator = () => {
+  console.log('AppNavigator rendered');
   const { user, loading } = useAuth();
 
   if (loading) {
     return null;
   }
+
+  console.log('AppNavigator rendered');
 
   return (
     <Stack.Navigator

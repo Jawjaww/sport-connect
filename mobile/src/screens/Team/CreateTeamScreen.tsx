@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, StyleSheet, Alert } from 'react-native';
 import { TextInput, Button, Text, useTheme } from 'react-native-paper';
 import { useAuth } from '../../hooks/useAuth';
-import { createTeam } from '../../services/team.service';
-import * as ImagePicker from 'expo-image-picker';
+import { teamService } from '../../services/team.service';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { RootStackParamList } from '../../types/navigation';
+import type { RootStackParamList } from '../../types/navigationTypes';
+import { CreateTeamRequest } from '../../types/sharedTypes';
+import { Team } from '../../types/sharedTypes'; // Modifié pour correspondre aux nouvelles exportations
+import * as ImagePicker from 'expo-image-picker';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -18,7 +20,8 @@ const CreateTeamScreen = () => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [logoUri, setLogoUri] = useState<string | null>(null);
-  const [sport, setSport] = useState('Football');
+  const [sport, setSport] = useState('');
+  const [location, setLocation] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleImagePick = async () => {
@@ -34,59 +37,48 @@ const CreateTeamScreen = () => {
     }
   };
 
-  const handleSubmit = async () => {
-    console.log('Début de la création d\'équipe...');
-    
+  const handleCreateTeam = async () => {
     if (!user) {
-      console.error('Erreur: Utilisateur non connecté');
-      Alert.alert('Erreur', 'Vous devez être connecté pour créer une équipe');
+      Alert.alert('Error', 'You must be logged in to create a team');
       return;
     }
 
     if (!name.trim()) {
-      console.error('Erreur: Nom d\'équipe vide');
-      Alert.alert('Erreur', 'Le nom de l\'équipe est requis');
+      Alert.alert('Error', 'Team name is required');
       return;
     }
 
     try {
       setIsLoading(true);
-      console.log('Appel de createTeam avec les paramètres:', {
+      const teamData: CreateTeamRequest = {
         name: name.trim(),
-        description: description.trim(),
-        sport: sport.trim(),
-        userId: user.id
-      });
-
-      const result = await createTeam({
-        name: name.trim(),
-        description: description.trim(),
+        description: description.trim() || undefined,
         sport: sport.trim() || 'Football',
-      }, user.id);
+        owner_id: user.id,
+        status: 'active',
+        location: location.trim() || undefined,
+        logo_url: logoUri || undefined,
+      };
 
-      console.log('Résultat de createTeam:', result);
-
-      if (result.data) {
-        console.log('Équipe créée avec succès:', result.data);
+      const newTeam = await teamService.createTeam(teamData);
+      if (newTeam) {
+        Alert.alert('Success', 'Team created successfully');
         navigation.navigate('ManagedTeams');
-      } else {
-        console.error('Erreur dans la réponse:', result.error);
-        throw new Error(result.error?.message || 'Erreur lors de la création de l\'équipe');
       }
     } catch (error) {
-      console.error('Erreur complète lors de la création:', error);
-      Alert.alert('Erreur', 'Une erreur est survenue lors de la création de l\'équipe');
+      console.error('Error creating team:', error);
+      Alert.alert('Error', 'Failed to create team');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Créer une nouvelle équipe</Text>
+    <View style={styles.container}>
+      <Text style={styles.title}>Create a new team</Text>
 
       <TextInput
-        label="Nom de l'équipe"
+        label="Team Name"
         value={name}
         onChangeText={setName}
         mode="outlined"
@@ -105,25 +97,34 @@ const CreateTeamScreen = () => {
       />
 
       <TextInput
-        label="Sport (optionnel)"
+        label="Sport"
         value={sport}
         onChangeText={setSport}
         mode="outlined"
         style={styles.input}
         disabled={isLoading}
-        placeholder="Football (par défaut)"
+        placeholder="Football (default)"
+      />
+
+      <TextInput
+        label="Location"
+        value={location}
+        onChangeText={setLocation}
+        mode="outlined"
+        style={styles.input}
+        disabled={isLoading}
       />
 
       <Button
         mode="contained"
-        onPress={handleSubmit}
+        onPress={handleCreateTeam}
         loading={isLoading}
         disabled={isLoading || !name.trim()}
         style={styles.button}
       >
-        Créer l'équipe
+        Create Team
       </Button>
-    </ScrollView>
+    </View>
   );
 };
 

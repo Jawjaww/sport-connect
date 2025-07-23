@@ -1,163 +1,204 @@
-import { createTeam, getLocalTeams, deleteTeam, regenerateTeamCode } from '../team.service';
-import * as SQLiteService from '../sqlite.service';
-import { getUserId } from '../../services/auth.service';
-import { supabase } from '../../services/supabase';
-import { Team, CreateTeamDTO } from '../../types/database';
-import * as SQLite from 'expo-sqlite';
+import { teamService } from '../team.service';
+import { SQLiteService } from '../sqlite.service';
 
-// Enhanced Mock for SQLite
-jest.mock('expo-sqlite', () => ({
-  openDatabaseSync: jest.fn().mockReturnValue({
-    runAsync: jest.fn(),
-    getAllAsync: jest.fn(),
-  }),
-}));
+// Mock Supabase client with custom type
+interface MockSupabaseClient {
+  from: jest.Mock;
+  select: jest.Mock;
+  insert: jest.Mock;
+  update: jest.Mock;
+  delete: jest.Mock;
+  eq: jest.Mock;
+  single: jest.Mock;
+  upsert: jest.Mock;
+  order: jest.Mock;
+}
 
-// Mock dependencies
+const supabase = jest.mocked<MockSupabaseClient>({
+  from: jest.fn().mockReturnThis(),
+  select: jest.fn().mockReturnThis(),
+  insert: jest.fn().mockReturnThis(),
+  update: jest.fn().mockReturnThis(),
+  delete: jest.fn().mockReturnThis(),
+  eq: jest.fn().mockReturnThis(),
+  single: jest.fn().mockReturnThis(),
+  upsert: jest.fn().mockReturnThis(),
+  order: jest.fn().mockReturnThis()
+});
+
+// Mock data
+const mockTeamId = 'team-123';
+const mockTeamCode = 'ABC123';
+const mockTeamData = {
+  id: mockTeamId,
+  name: 'Test Team',
+  sport: 'Football',
+  description: 'Test description',
+  owner_id: 'user-123',
+  status: 'active'
+};
+
+// Mock SQLiteService
 jest.mock('../sqlite.service', () => ({
-  runAsync: jest.fn(),
-  getAllAsync: jest.fn(),
-  saveTeamCode: jest.fn(),
-  getTeamCode: jest.fn(),
-}));
-
-jest.mock('../../services/auth.service', () => ({
-  getUserId: jest.fn()
-}));
-
-jest.mock('../../services/supabase', () => ({
-  supabase: {
-    auth: {
-      getUser: jest.fn().mockResolvedValue({
-        data: { user: { id: 'user123' } }
-      })
-    },
-    from: jest.fn().mockReturnThis(),
-    select: jest.fn().mockReturnThis(),
-    insert: jest.fn().mockReturnThis(),
-    upsert: jest.fn().mockReturnThis(),
-    single: jest.fn().mockReturnThis(),
-    eq: jest.fn().mockReturnThis(),
-    delete: jest.fn().mockReturnThis(),
+  SQLiteService: {
+    runAsync: jest.fn(),
+    saveTeamCode: jest.fn()
   }
 }));
-
-// Mock UUID to generate predictable IDs
-jest.mock('uuid', () => ({
-  v4: jest.fn().mockReturnValue('test-team-id')
-}));
-
-const mockTeamId = 'test-team-id';
-const mockTeamCode = 'ABC123';
 
 describe('Team Service', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (SQLiteService.getTeamCode as jest.Mock).mockResolvedValue(null);
-    (SQLiteService.saveTeamCode as jest.Mock).mockResolvedValue(true);
-    (SQLiteService.runAsync as jest.Mock).mockResolvedValue(true);
-    (SQLiteService.getAllAsync as jest.Mock).mockResolvedValue([]);
+    
+    // Configure mock responses
+    supabase.select.mockResolvedValue({ data: [mockTeamData], error: null });
+    supabase.insert.mockResolvedValue({ data: mockTeamData, error: null });
+    supabase.update.mockResolvedValue({ data: mockTeamData, error: null });
+    supabase.delete.mockResolvedValue({ error: null });
+    supabase.upsert.mockResolvedValue({ data: { code: mockTeamCode }, error: null });
   });
 
   describe('createTeam', () => {
     it('should create a team successfully', async () => {
-      const teamData: CreateTeamDTO = {
-        name: 'Test Team', 
-        sport: 'Football', 
-        description: 'Test Description'
-      };
+      const result = await teamService.createTeam(mockTeamData);
 
-      // Mock Supabase insert
-      (supabase.from('teams').upsert as jest.Mock).mockResolvedValue({
-        data: [{
-          id: mockTeamId,
-          name: teamData.name,
-          sport: teamData.sport,
-          description: teamData.description,
-          owner_id: 'user123',
-          team_code: mockTeamCode,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          players: null,
-          status: 'active',
-          logo_url: null,
-          location: null
-        }],
-        error: null
-      });
-
-      const result = await createTeam(teamData);
-      
-      expect(result.data).toBeDefined();
-      expect(result.data?.id).toBe(mockTeamId);
-      expect(result.data?.name).toBe(teamData.name);
-      expect(result.data?.sport).toBe(teamData.sport);
-      expect(result.data?.team_code).toBe(mockTeamCode);
+      expect(result).toBeDefined();
       expect(result.error).toBeNull();
+      expect(result.data).toBeDefined();
+      expect(result.data).toMatchObject([mockTeamData]);
+      expect(supabase.from).toHaveBeenCalledWith('teams');
+      expect(supabase.insert).toHaveBeenCalledWith([mockTeamData]);
+      expect(SQLiteService.runAsync).toHaveBeenCalled();
+    });
+
+    it('should handle errors when creating a team', async () => {
+      const errorMessage = 'Database error';
+      supabase.insert.mockRejectedValue(new Error(errorMessage));
+
+      const result = await teamService.createTeam(mockTeamData);
+
+      expect(result).toBeDefined();
+      expect(result.error).toBeDefined();
+      expect(result.data).toBeNull();
     });
   });
 
   describe('regenerateTeamCode', () => {
-    it('generates a new team code', async () => {
-      // Mock Supabase upsert for team code regeneration
-      (supabase.from('teams').upsert as jest.Mock).mockResolvedValue({
-        data: [{ 
-          id: mockTeamId, 
-          team_code: mockTeamCode 
-        }],
-        error: null
-      });
+    it('should generate a new team code', async () => {
+      const result = await teamService.regenerateTeamCode(mockTeamId);
 
-      const result = await regenerateTeamCode(mockTeamId);
-      
-      expect(result).toBe(mockTeamCode);
-      expect(SQLiteService.runAsync).toHaveBeenCalled();
+      expect(result).toBeDefined();
+      expect(result.error).toBeNull();
+      expect(result.data).toBeDefined();
+      expect(result.data).toBe(mockTeamCode);
+      expect(supabase.from).toHaveBeenCalledWith('team_codes');
+      expect(supabase.upsert).toHaveBeenCalledWith({
+        team_id: mockTeamId,
+        code: expect.any(String)
+      });
+      expect(SQLiteService.saveTeamCode).toHaveBeenCalled();
     });
 
-    it('handles SQLite errors', async () => {
-      (SQLiteService.runAsync as jest.Mock).mockRejectedValue(new Error('Database error'));
-      
-      await expect(regenerateTeamCode(mockTeamId)).rejects.toThrow('Database error');
+    it('should handle errors when regenerating team code', async () => {
+      const errorMessage = 'Database error';
+      supabase.upsert.mockRejectedValue(new Error(errorMessage));
+
+      const result = await teamService.regenerateTeamCode(mockTeamId);
+
+      expect(result).toBeDefined();
+      expect(result.error).toBeDefined();
+      expect(result.data).toBeNull();
     });
   });
 
-  describe('getLocalTeams', () => {
-    it('retrieves local teams', async () => {
-      const mockTeams: Team[] = [{
-        id: mockTeamId,
-        team_code: mockTeamCode,
-        name: 'Test Team',
-        sport: 'Football',
-        description: 'Test Description',
-        owner_id: 'user123',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        players: null,
-        status: 'active',
-        logo_url: null,
-        location: null
-      }];
+  describe('getAllTeams', () => {
+    it('should retrieve teams successfully', async () => {
+      const result = await teamService.getAllTeams();
 
-      // Mock getAllAsync to return mock teams
-      (SQLiteService.getAllAsync as jest.Mock).mockResolvedValue(mockTeams);
+      expect(result).toBeDefined();
+      expect(result.error).toBeNull();
+      expect(result.data).toBeDefined();
+      expect(Array.isArray(result.data)).toBeTruthy();
+      expect(result.data?.length).toBeGreaterThan(0);
+      expect(supabase.from).toHaveBeenCalledWith('teams');
+      expect(supabase.select).toHaveBeenCalledWith('*');
+      expect(SQLiteService.runAsync).toHaveBeenCalled();
+    });
 
-      const teams = await getLocalTeams();
-      
-      expect(teams.length).toBeGreaterThan(0);
-      expect(teams[0].id).toBe(mockTeamId);
-      expect(teams[0].team_code).toBe(mockTeamCode);
+    it('should handle empty results', async () => {
+      supabase.select.mockResolvedValue({ data: [], error: null });
+
+      const result = await teamService.getAllTeams();
+
+      expect(result).toBeDefined();
+      expect(result.error).toBeNull();
+      expect(result.data?.length).toBe(0);
+    });
+
+    it('should handle errors when retrieving teams', async () => {
+      const errorMessage = 'Database error';
+      supabase.select.mockRejectedValue(new Error(errorMessage));
+
+      const result = await teamService.getAllTeams();
+
+      expect(result).toBeDefined();
+      expect(result.error).toBeDefined();
+      expect(result.data).toBeNull();
     });
   });
 
   describe('deleteTeam', () => {
-    it('deletes a team successfully', async () => {
-      (supabase.from('teams').delete as jest.Mock).mockResolvedValue({
-        data: null,
-        error: null
-      });
+    it('should delete a team successfully', async () => {
+      const result = await teamService.deleteTeam(mockTeamId);
 
-      const result = await deleteTeam(mockTeamId);
-      expect(result).toBe(true);
+      expect(result).toBeDefined();
+      expect(result.error).toBeNull();
+      expect(supabase.from).toHaveBeenCalledWith('teams');
+      expect(supabase.delete).toHaveBeenCalled();
+      expect(supabase.eq).toHaveBeenCalledWith('id', mockTeamId);
+      expect(SQLiteService.runAsync).toHaveBeenCalled();
+    });
+
+    it('should handle errors when deleting a team', async () => {
+      const errorMessage = 'Database error';
+      supabase.delete.mockRejectedValue(new Error(errorMessage));
+
+      const result = await teamService.deleteTeam(mockTeamId);
+
+      expect(result).toBeDefined();
+      expect(result.error).toBeDefined();
+    });
+  });
+
+  describe('shareTeamCode', () => {
+    beforeEach(() => {
+      jest.spyOn(teamService, 'getTeamCodeDetails')
+        .mockResolvedValue({ data: mockTeamCode, error: null });
+    });
+
+    it('should generate share link successfully', async () => {
+      const result = await teamService.shareTeamCode(mockTeamId);
+
+      expect(result).toBeDefined();
+      expect(result.error).toBeNull();
+      expect(result.teamCode).toBe(mockTeamCode);
+      expect(result.shareLink).toBe(
+        `https://sportconnect.app/join?team=${mockTeamId}&code=${mockTeamCode}`
+      );
+      expect(teamService.getTeamCodeDetails).toHaveBeenCalledWith(mockTeamId);
+    });
+
+    it('should handle errors when getting team code', async () => {
+      const errorMessage = 'Code not found';
+      jest.spyOn(teamService, 'getTeamCodeDetails')
+        .mockResolvedValue({ data: null, error: errorMessage });
+
+      const result = await teamService.shareTeamCode(mockTeamId);
+
+      expect(result).toBeDefined();
+      expect(result.error).toBeDefined();
+      expect(result.teamCode).toBeNull();
+      expect(result.shareLink).toBeNull();
     });
   });
 });

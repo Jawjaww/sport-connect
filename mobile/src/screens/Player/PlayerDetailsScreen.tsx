@@ -2,7 +2,7 @@ import React from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { Text, Avatar, Card, useTheme } from 'react-native-paper';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { TeamStackParamList } from '../../types/navigation';
+import { TeamStackParamList } from '../../types/navigationTypes';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../services/supabase';
 import type { PlayerProfile, PlayerStats } from '../../types';

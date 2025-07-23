@@ -2,8 +2,7 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Text } from 'react-native-paper';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import type { HomeStackParamList } from '../../types/navigation';
-
+import type { HomeStackParamList } from '../../types/navigationTypes';
 type Props = NativeStackScreenProps<HomeStackParamList, 'TournamentDetails'>;
 
 const TournamentDetailsScreen: React.FC<Props> = ({ route, navigation }) => {

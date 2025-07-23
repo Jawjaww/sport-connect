@@ -9,7 +9,7 @@ import { supabase } from '../../services/supabase';
 import { useNavigation } from '@react-navigation/native';
 import { StatsOverview } from '../../components/StatsOverview';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import type { HomeStackParamList } from '../../types/navigation';
+import type { HomeStackParamList } from '../../types/navigationTypes';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'Profile'>;
 

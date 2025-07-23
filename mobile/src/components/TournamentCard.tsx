@@ -17,8 +17,8 @@ const TournamentCard: React.FC<TournamentCardProps> = ({ tournament, onPress }) 
         <Text variant="titleLarge">{tournament.name}</Text>
         <View style={styles.details}>
           <Text variant="bodyMedium">
-            {format(new Date(tournament.start_date), 'PPP', { locale: fr })} -{' '}
-            {format(new Date(tournament.end_date), 'PPP', { locale: fr })}
+            {format(new Date(tournament.startDate), 'PPP', { locale: fr })} -{' '}
+            {format(new Date(tournament.endDate), 'PPP', { locale: fr })}
           </Text>
           <Text variant="bodyMedium">
             {tournament.teams.length} équipe{tournament.teams.length > 1 ? 's' : ''}

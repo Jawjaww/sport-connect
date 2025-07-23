@@ -2,32 +2,40 @@ import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { Text, useTheme, Button } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import Animated, { 
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { HomeStackParamList } from '../../types/navigationTypes';
+import Animated, {
   FadeInDown, 
   FadeOutUp, 
   SlideInRight,
-  useAnimatedStyle,
-  withSpring
 } from 'react-native-reanimated';
 import LottieView from 'lottie-react-native';
-import type { HomeStackScreenProps } from '../../types/navigation';
-import MatchCard from '../../components/MatchCard';
-import TournamentCard from '../../components/TournamentCard';
-import { supabase } from '../../services/supabase';
-import { Match, Tournament } from '../../types';
+import { MatchCard } from '@components/MatchCard';
+import TournamentCard from '@components/TournamentCard';
+import { supabase } from '@services/supabase';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
-import { getLocalTeams } from '../../services/team.service';
+import { teamService } from '@services/team.service';
+import { NativeEventEmitter, NativeModules } from 'react-native';
+import { Team } from '../../types/sharedTypes'; 
 
-type Props = HomeStackScreenProps<'HomeMain'>;
+interface LocalMatch {
+  id: string;
+  teamAId: string;
+  teamBId: string;
+  date: string;
+  status: string;
+}
+
+type Props = NativeStackScreenProps<HomeStackParamList, 'Home'>;
 
 const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const theme = useTheme();
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
-  const [localTeams, setLocalTeams] = useState<any[]>([]);
+  const [localTeams, setLocalTeams] = useState<LocalMatch[]>([]);
 
-  const { data: matches, isLoading: isLoadingMatches, error: errorMatches } = useQuery<Match[]>({
+  const { data: matches, isLoading: isLoadingMatches, error: errorMatches } = useQuery<any[]>({
     queryKey: ['matches'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -42,7 +50,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     },
   });
 
-  const { data: tournaments, isLoading: isLoadingTournaments, error: errorTournaments } = useQuery<Tournament[]>({
+  const { data: tournaments, isLoading: isLoadingTournaments, error: errorTournaments } = useQuery<any[]>({
     queryKey: ['tournaments'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -57,11 +65,26 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     },
   });
 
+  const { data: teams = [], error, isLoading } = useQuery<Team[], Error>({
+    queryKey: ['teams'],
+    queryFn: async () => {
+      const result = await teamService.getAllTeams();
+      if (result.error) throw new Error(result.error);
+      return result.data || [];
+    }
+  });
+
   // Fetch local teams
   const fetchLocalTeams = async () => {
     try {
-      const teams = await getLocalTeams();
-      setLocalTeams(teams);
+      const matches = teams.map((team, index) => ({
+        id: `match-${index}`, 
+        teamAId: team.id,     
+        teamBId: teams[(index + 1) % teams.length]?.id, 
+        date: new Date().toISOString(), 
+        status: 'scheduled',   
+      }));
+      setLocalTeams(matches); 
     } catch (error) {
       console.error('Error fetching local teams:', error);
     }
@@ -69,17 +92,19 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
   // Listen for team sync events
   useEffect(() => {
-    const handleTeamSynced = () => {
-      fetchLocalTeams();
-    };
-
-    window.addEventListener('teamSynced', handleTeamSynced);
-
+    console.log('HomeScreen mounted');
+    console.log('HomeScreen mounted');
     // Initial fetch
     fetchLocalTeams();
 
+    // For team sync events, we should use React Native's event emitter
+    const eventEmitter = new NativeEventEmitter(NativeModules.EventEmitter);
+    const subscription = eventEmitter.addListener('teamSynced', () => {
+      fetchLocalTeams();
+    });
+
     return () => {
-      window.removeEventListener('teamSynced', handleTeamSynced);
+      subscription.remove();
     };
   }, []);
 
@@ -173,7 +198,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
               size={24} 
               color={theme.colors.primary} 
             />
-            <Text variant="headlineSmall" style={styles.sectionTitle}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.primary, marginLeft: 8, fontWeight: '600' }]}>
               Prochains matchs
             </Text>
           </View>
@@ -213,7 +238,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
               size={24} 
               color={theme.colors.primary} 
             />
-            <Text variant="headlineSmall" style={styles.sectionTitle}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.primary, marginLeft: 8, fontWeight: '600' }]}>
               Tournois en cours
             </Text>
           </View>

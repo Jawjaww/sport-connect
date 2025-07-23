@@ -1,6 +1,6 @@
 import { LinkingOptions } from '@react-navigation/native';
 import { Linking } from 'react-native';
-import { RootStackParamList } from '../types/navigation';
+import { RootStackParamList } from '../types/navigationTypes';
 
 export const linking: LinkingOptions<RootStackParamList> = {
   prefixes: [
@@ -35,7 +35,7 @@ export const linking: LinkingOptions<RootStackParamList> = {
           TournamentDetails: 'tournament/:tournamentId',
         },
       },
-      Team: {
+      Teams: {
         screens: {
           TeamMain: 'team',
           CreateTeam: 'create',

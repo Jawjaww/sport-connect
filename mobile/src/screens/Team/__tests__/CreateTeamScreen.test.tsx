@@ -5,8 +5,9 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import CreateTeamScreen from '../CreateTeamScreen';
 import { AuthProvider } from '../../../contexts/AuthContext';
 import { ThemeProvider } from '../../../contexts/ThemeContext';
-import * as TeamService from '../../../services/team.service';
+import { teamService } from '../../../services/team.service';
 import { Alert } from 'react-native';
+import { CreateTeamRequest } from '../../../types/sharedTypes';
 
 // Mock dependencies
 jest.mock('../../../services/team.service');
@@ -46,11 +47,14 @@ describe('CreateTeamScreen', () => {
 
   it('should create a team and save team code successfully', async () => {
     // Mock successful team creation
-    (TeamService.createTeam as jest.Mock).mockResolvedValue({
-      id: 'team123',
-      name: 'Test Team',
-      sport: 'Football',
-      team_code: 'ABC123'
+    (teamService.createTeam as jest.Mock).mockResolvedValue({
+      data: [{
+        id: 'team123',
+        name: 'Test Team',
+        sport: 'Football',
+        team_code: 'ABC123'
+      }],
+      error: null
     });
 
     const { getByPlaceholderText, getByText } = renderCreateTeamScreen();
@@ -64,9 +68,16 @@ describe('CreateTeamScreen', () => {
     fireEvent.changeText(sportInput, 'Football');
     fireEvent.press(createButton);
 
+    const expectedTeamData: CreateTeamRequest = {
+      name: 'Test Team',
+      sport: 'Football',
+      owner_id: 'user123',
+      status: 'active'
+    };
+
     // Wait for team creation
     await waitFor(() => {
-      expect(TeamService.createTeam).toHaveBeenCalledWith('Test Team', 'Football');
+      expect(teamService.createTeam).toHaveBeenCalledWith(expectedTeamData);
       expect(Alert.alert).toHaveBeenCalledWith(
         'Équipe créée',
         'Votre équipe a été créée avec succès. Code de l\'équipe : ABC123'
@@ -76,7 +87,10 @@ describe('CreateTeamScreen', () => {
 
   it('should handle team creation error', async () => {
     // Mock team creation error
-    (TeamService.createTeam as jest.Mock).mockRejectedValue(new Error('Creation failed'));
+    (teamService.createTeam as jest.Mock).mockResolvedValue({
+      data: null,
+      error: 'Creation failed'
+    });
 
     const { getByPlaceholderText, getByText } = renderCreateTeamScreen();
 
@@ -100,7 +114,10 @@ describe('CreateTeamScreen', () => {
 
   it('should handle SQLite error', async () => {
     // Mock SQLite error during team creation
-    (TeamService.createTeam as jest.Mock).mockRejectedValue(new Error('SQLite error'));
+    (teamService.createTeam as jest.Mock).mockResolvedValue({
+      data: null,
+      error: 'SQLite error'
+    });
 
     const { getByPlaceholderText, getByText } = renderCreateTeamScreen();
 

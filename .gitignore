@@ -34,3 +34,7 @@ yarn-error.log*
 .idea/
 *.sublime-project
 *.sublime-workspace
+
+#Fcm firebase
+google-services.json
+GoogleService-Info.plist

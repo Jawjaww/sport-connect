@@ -10,9 +10,24 @@ import {
   HelperText,
 } from 'react-native-paper';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { TeamStackParamList } from '../../types';
+import { TeamStackParamList } from '../../types/navigationTypes';
 import { validateInvitationCode, joinTeam } from '../../services/invitationCodes';
 import { useAuth } from '../../hooks/useAuth';
+
+// Ensure that 'TeamMain' is a valid key in TeamStackParamList
+// If not, add it to the TeamStackParamList definition in the navigation types.
+// Example:
+// export type TeamStackParamList = {
+//   JoinTeam: undefined;
+//   TeamMain: { teamId: string; }; // teamId is expected to be a string
+//   // Add other expected keys here, e.g.
+//   // TeamSettings: { teamId: string; settingId: number; };
+//   // TeamMembers: { teamId: string; memberId: string; };
+//   // TeamInvitations: { teamId: string; invitationId: string; };
+// };
+
+// When adding new keys to TeamStackParamList, make sure to update the corresponding screen components
+// to handle the new parameters correctly.
 
 type Props = NativeStackScreenProps<TeamStackParamList, 'JoinTeam'>;
 
@@ -51,16 +66,25 @@ const JoinTeamScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const handleJoinTeam = async () => {
-    if (!teamData || !user) return;
+    if (!user || !user.id || !teamData || !teamData.team || !teamData.team.id) {
+      setError('Informations manquantes pour rejoindre l\'équipe.');
+      return;
+    }
+
+    console.log('teamData:', teamData);
+    console.log('user:', user);
+    console.log('teamData:', teamData);
+    console.log('user:', user);
 
     setLoading(true);
     try {
-      const { error } = await joinTeam(user.id, teamData.team.id);
+      const { error } = await joinTeam(user.id, teamData.team.id, 'player');
       
       if (error) {
-        setError('Impossible de rejoindre l\'équipe');
+        const errorMessage = (error as { message?: string }).message || 'Une erreur inconnue est survenue.';
+        setError('Impossible de rejoindre l\'équipe: ' + errorMessage);
       } else {
-        navigation.replace('TeamMain');
+        navigation.navigate('TeamDetails', { teamId: teamData.team.id.toString() });
       }
     } catch (err) {
       setError('Une erreur est survenue');

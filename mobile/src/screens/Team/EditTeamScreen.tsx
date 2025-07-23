@@ -15,7 +15,8 @@ import {
   HelperText,
 } from 'react-native-paper';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { TeamStackParamList, Team } from '../../types';
+import { TeamStackParamList } from '../../types/navigationTypes'; 
+import { Team } from '../../types/sharedTypes';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import * as ImagePicker from 'expo-image-picker';

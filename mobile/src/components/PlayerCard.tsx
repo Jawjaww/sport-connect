@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Avatar, Card, Text, useTheme, IconButton } from 'react-native-paper';
-import { Player } from '../types';
+import { Player } from '../types/sharedTypes';
 
 interface PlayerCardProps {
   player: Player;
@@ -60,40 +60,52 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
             </Text>
 
             <View style={styles.statsContainer}>
-              <View style={styles.statItem}>
+              {player.stats ? (
+                <>
+                  {player.stats.matches_played !== undefined && (
+                    <View style={styles.statItem}>
+                      <Text variant="labelSmall" style={styles.statLabel}>
+                        Matchs
+                      </Text>
+                      <Text variant="bodyMedium">
+                        {player.stats.matches_played || 0}
+                      </Text>
+                    </View>
+                  )}
+
+                  {player.stats.average_rating !== undefined && (
+                    <View style={styles.statItem}>
+                      <Text variant="labelSmall" style={styles.statLabel}>
+                        Note
+                      </Text>
+                      <Text variant="bodyMedium">
+                        {(player.stats.average_rating || 0).toFixed(1)}
+                      </Text>
+                    </View>
+                  )}
+
+                  {player.stats.goals !== undefined && (
+                    <View style={styles.statItem}>
+                      <Text variant="labelSmall" style={styles.statLabel}>
+                        Buts
+                      </Text>
+                      <Text variant="bodyMedium">{player.stats.goals}</Text>
+                    </View>
+                  )}
+
+                  {player.stats.assists !== undefined && (
+                    <View style={styles.statItem}>
+                      <Text variant="labelSmall" style={styles.statLabel}>
+                        Passes D.
+                      </Text>
+                      <Text variant="bodyMedium">{player.stats.assists}</Text>
+                    </View>
+                  )}
+                </>
+              ) : (
                 <Text variant="labelSmall" style={styles.statLabel}>
-                  Matchs
+                  Aucune statistique disponible
                 </Text>
-                <Text variant="bodyMedium">
-                  {player.stats.matches_played}
-                </Text>
-              </View>
-
-              <View style={styles.statItem}>
-                <Text variant="labelSmall" style={styles.statLabel}>
-                  Note
-                </Text>
-                <Text variant="bodyMedium">
-                  {player.stats.average_rating.toFixed(1)}
-                </Text>
-              </View>
-
-              {player.stats.goals !== undefined && (
-                <View style={styles.statItem}>
-                  <Text variant="labelSmall" style={styles.statLabel}>
-                    Buts
-                  </Text>
-                  <Text variant="bodyMedium">{player.stats.goals}</Text>
-                </View>
-              )}
-
-              {player.stats.assists !== undefined && (
-                <View style={styles.statItem}>
-                  <Text variant="labelSmall" style={styles.statLabel}>
-                    Passes D.
-                  </Text>
-                  <Text variant="bodyMedium">{player.stats.assists}</Text>
-                </View>
               )}
             </View>
           </View>

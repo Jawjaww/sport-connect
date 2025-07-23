@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import type { Profile } from '../types/sharedTypes';
 
 export class ProfileService {
   static async getProfile(): Promise<any | null> {
@@ -29,7 +30,7 @@ export class ProfileService {
     }
   }
 
-  static async upsertProfile(profile: any): Promise<any> {
+  static async upsertProfile(profile: Partial<Profile>): Promise<Profile> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
 

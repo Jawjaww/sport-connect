@@ -1,215 +1,222 @@
--- Création de la table profiles
+/*
+ * Database schema for SportConnect application
+ * Contains all tables and relationships needed for core functionality
+ * Includes user profiles, teams, matches, tournaments and player statistics
+ */
+
+-- Drop existing tables to ensure clean slate
+DROP TABLE IF EXISTS profiles CASCADE;
+DROP TABLE IF EXISTS teams CASCADE;
+DROP TABLE IF EXISTS team_members CASCADE;
+DROP TABLE IF EXISTS matches CASCADE;
+DROP TABLE IF EXISTS tournaments CASCADE;
+DROP TABLE IF EXISTS player_stats CASCADE;
+
+/*
+ * User profiles table
+ * Stores basic user information and authentication references
+ */
 CREATE TABLE profiles (
-    id UUID REFERENCES auth.users NOT NULL PRIMARY KEY,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
-    username TEXT UNIQUE NOT NULL,
-    full_name TEXT,
-    avatar_url TEXT,
-    sports TEXT[] DEFAULT '{}',
-    location JSONB,
-    bio TEXT,
-    CONSTRAINT username_length CHECK (char_length(username) >= 3)
+    id UUID PRIMARY KEY REFERENCES auth.users ON DELETE CASCADE, -- Links to Supabase auth system
+    first_name TEXT NOT NULL, -- User's first name
+    last_name TEXT NOT NULL, -- User's last name
+    full_name TEXT, -- Optional full name display
+    email TEXT UNIQUE NOT NULL, -- User's email address
+    avatar_url TEXT, -- URL to user's profile picture
+    created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL, -- Record creation timestamp
+    updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL -- Last update timestamp
 );
 
--- Trigger pour mettre à jour updated_at
-CREATE TRIGGER handle_updated_at BEFORE UPDATE ON profiles
-    FOR EACH ROW EXECUTE FUNCTION moddatetime (updated_at);
-
--- Création de la table events
-CREATE TABLE events (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
-    title TEXT NOT NULL,
-    description TEXT NOT NULL,
-    sport TEXT NOT NULL,
-    date TIMESTAMP WITH TIME ZONE NOT NULL,
-    location JSONB NOT NULL,
-    creator_id UUID REFERENCES profiles(id) NOT NULL,
-    max_participants INTEGER NOT NULL,
-    current_participants UUID[] DEFAULT '{}',
-    status TEXT DEFAULT 'open' CHECK (status IN ('open', 'full', 'cancelled', 'completed')),
-    skill_level TEXT NOT NULL CHECK (skill_level IN ('beginner', 'intermediate', 'advanced', 'all'))
-);
-
--- Trigger pour mettre à jour updated_at
-CREATE TRIGGER handle_updated_at BEFORE UPDATE ON events
-    FOR EACH ROW EXECUTE FUNCTION moddatetime (updated_at);
-
--- Création de la table chats
-CREATE TABLE chats (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
-    event_id UUID REFERENCES events(id) ON DELETE CASCADE NOT NULL,
-    user_id UUID REFERENCES profiles(id) NOT NULL,
-    message TEXT NOT NULL,
-    type TEXT DEFAULT 'text' CHECK (type IN ('text', 'image'))
-);
-
--- Création de la table notifications
-CREATE TABLE notifications (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
-    user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
-    type TEXT NOT NULL CHECK (type IN ('event_invitation', 'event_update', 'chat_message', 'event_reminder')),
-    content JSONB NOT NULL,
-    read BOOLEAN DEFAULT false
-);
-
--- Création des index pour améliorer les performances
-CREATE INDEX events_date_idx ON events(date);
-CREATE INDEX events_sport_idx ON events(sport);
-CREATE INDEX events_status_idx ON events(status);
-CREATE INDEX chats_event_id_idx ON chats(event_id);
-CREATE INDEX notifications_user_id_idx ON notifications(user_id);
-CREATE INDEX notifications_read_idx ON notifications(read);
-
--- Politiques de sécurité Row Level Security (RLS)
-
--- Profiles
-ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Public profiles are viewable by everyone"
-    ON profiles FOR SELECT
-    USING (true);
-
-CREATE POLICY "Users can insert their own profile"
-    ON profiles FOR INSERT
-    WITH CHECK (auth.uid() = id);
-
-CREATE POLICY "Users can update their own profile"
-    ON profiles FOR UPDATE
-    USING (auth.uid() = id);
-
--- Events
-ALTER TABLE events ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Events are viewable by everyone"
-    ON events FOR SELECT
-    USING (true);
-
-CREATE POLICY "Authenticated users can create events"
-    ON events FOR INSERT
-    WITH CHECK (auth.role() = 'authenticated');
-
-CREATE POLICY "Event creators can update their events"
-    ON events FOR UPDATE
-    USING (auth.uid() = creator_id);
-
--- Chats
-ALTER TABLE chats ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Chat participants can view messages"
-    ON chats FOR SELECT
-    USING (
-        EXISTS (
-            SELECT 1 FROM events
-            WHERE events.id = chats.event_id
-            AND (
-                events.creator_id = auth.uid()
-                OR auth.uid() = ANY(events.current_participants)
-            )
-        )
-    );
-
-CREATE POLICY "Chat participants can insert messages"
-    ON chats FOR INSERT
-    WITH CHECK (
-        EXISTS (
-            SELECT 1 FROM events
-            WHERE events.id = chats.event_id
-            AND (
-                events.creator_id = auth.uid()
-                OR auth.uid() = ANY(events.current_participants)
-            )
-        )
-    );
-
--- Notifications
-ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users can view their own notifications"
-    ON notifications FOR SELECT
-    USING (auth.uid() = user_id);
-
-CREATE POLICY "System can create notifications"
-    ON notifications FOR INSERT
-    WITH CHECK (true);
-
-CREATE POLICY "Users can update their own notifications"
-    ON notifications FOR UPDATE
-    USING (auth.uid() = user_id);
-
--- Création de la table teams
+/*
+ * Teams table
+ * Stores information about sports teams
+ */
 CREATE TABLE teams (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
-    name TEXT NOT NULL,
-    description TEXT,
-    created_by UUID REFERENCES auth.users NOT NULL,
-    logo_url TEXT,
-    team_code TEXT UNIQUE DEFAULT upper(substring(md5(random()::text) from 1 for 8)),
-    sport TEXT,
-    status TEXT DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'archived'))
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(), -- Unique team identifier
+    name TEXT NOT NULL, -- Team name
+    description TEXT, -- Optional team description
+    sport TEXT NOT NULL, -- Sport type (e.g., football, basketball)
+    owner_id UUID REFERENCES profiles(id) ON DELETE SET NULL, -- Team owner reference
+    logo_url TEXT, -- URL to team logo
+    location TEXT, -- Team's home location
+    team_code TEXT UNIQUE, -- Unique code for team invitations
+    created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+    status TEXT DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'archived')) -- Team status
 );
 
--- Trigger pour mettre à jour updated_at
-CREATE TRIGGER handle_updated_at BEFORE UPDATE ON teams
-    FOR EACH ROW EXECUTE FUNCTION moddatetime (updated_at);
-
--- Création de la table team_members pour gérer les relations utilisateurs-équipes
+/*
+ * Team members table
+ * Manages relationships between users and teams
+ */
 CREATE TABLE team_members (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    team_id UUID REFERENCES teams(id) ON DELETE CASCADE,
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-    role TEXT NOT NULL CHECK (role IN ('player', 'manager', 'coach')),
-    joined_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
-    UNIQUE(team_id, user_id)
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(), -- Unique membership identifier
+    team_id UUID REFERENCES teams(id) ON DELETE CASCADE, -- Reference to team
+    user_id UUID REFERENCES profiles(id) ON DELETE CASCADE, -- Reference to user
+    role TEXT NOT NULL CHECK (role IN ('player', 'coach', 'manager', 'admin')), -- Member role
+    joined_at TIMESTAMPTZ DEFAULT NOW() NOT NULL, -- When member joined
+    left_at TIMESTAMPTZ, -- When member left (if applicable)
+    UNIQUE(team_id, user_id) -- Ensure unique membership
 );
 
--- Politiques de sécurité Row Level Security (RLS)
-ALTER TABLE teams ENABLE ROW LEVEL SECURITY;
+/*
+ * Matches table
+ * Stores information about scheduled and completed matches
+ */
+CREATE TABLE matches (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(), -- Unique match identifier
+    team_id UUID REFERENCES teams(id) ON DELETE CASCADE, -- Reference to team
+    opponent TEXT NOT NULL, -- Opponent team name
+    location TEXT, -- Match location
+    date TIMESTAMPTZ NOT NULL, -- Scheduled match date
+    score_team INTEGER, -- Team's score
+    score_opponent INTEGER, -- Opponent's score
+    status TEXT DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'ongoing', 'completed', 'cancelled')), -- Match status
+    created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
 
-CREATE POLICY "Teams are viewable by everyone"
-    ON teams FOR SELECT
-    USING (true);
+/*
+ * Tournaments table
+ * Stores information about sports tournaments
+ */
+CREATE TABLE tournaments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(), -- Unique tournament identifier
+    name TEXT NOT NULL, -- Tournament name
+    description TEXT, -- Tournament description
+    start_date TIMESTAMPTZ NOT NULL, -- Tournament start date
+    end_date TIMESTAMPTZ NOT NULL, -- Tournament end date
+    location TEXT, -- Tournament location
+    status TEXT DEFAULT 'upcoming' CHECK (status IN ('upcoming', 'ongoing', 'completed', 'cancelled')), -- Tournament status
+    created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
 
-CREATE POLICY "Authenticated users can create teams"
-    ON teams FOR INSERT
-    WITH CHECK (auth.role() = 'authenticated');
+/*
+ * Player ratings table
+ * Stores detailed player ratings from teammates
+ */
+CREATE TABLE player_ratings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    player_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+    rater_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+    match_id UUID REFERENCES matches(id) ON DELETE CASCADE,
+    offensive_skills NUMERIC(3, 2) CHECK (offensive_skills BETWEEN 0 AND 10),
+    defensive_skills NUMERIC(3, 2) CHECK (defensive_skills BETWEEN 0 AND 10),
+    passing NUMERIC(3, 2) CHECK (passing BETWEEN 0 AND 10),
+    dribbling NUMERIC(3, 2) CHECK (dribbling BETWEEN 0 AND 10),
+    team_spirit NUMERIC(3, 2) CHECK (team_spirit BETWEEN 0 AND 10),
+    created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+    UNIQUE(player_id, rater_id, match_id)
+);
 
-CREATE POLICY "Team creators can update their teams"
-    ON teams FOR UPDATE
-    USING (auth.uid() = created_by);
+/*
+ * Player statistics table
+ * Stores detailed player performance data based on peer ratings
+ * with optional influence on future selections
+ */
+CREATE TABLE player_stats (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(), -- Unique stat identifier
+    player_id UUID REFERENCES profiles(id) ON DELETE CASCADE, -- Reference to player
+    match_id UUID REFERENCES matches(id) ON DELETE CASCADE, -- Reference to match
+    offensive_skills NUMERIC(3, 2), -- Offensive capabilities (0.00 - 10.00)
+    defensive_skills NUMERIC(3, 2), -- Defensive capabilities (0.00 - 10.00)
+    attendance_score NUMERIC(3, 2), -- Attendance and commitment (0.00 - 10.00)
+    fun_factor NUMERIC(3, 2), -- How fun the player was to play with (0.00 - 10.00)
+    team_spirit NUMERIC(3, 2), -- Contribution to team atmosphere (0.00 - 10.00)
+    selection_weight NUMERIC(3, 2) DEFAULT 1.00, -- Influence on future selections (0.00 - 1.00)
+    created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
 
--- Politiques pour team_members
-ALTER TABLE team_members ENABLE ROW LEVEL SECURITY;
+/*
+ * Team selection settings table
+ * Allows manager to control rating influence on selections
+ */
+CREATE TABLE team_selection_settings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    team_id UUID REFERENCES teams(id) ON DELETE CASCADE UNIQUE,
+    use_ratings_for_selection BOOLEAN DEFAULT FALSE,
+    offensive_weight NUMERIC(3, 2) DEFAULT 0.25,
+    defensive_weight NUMERIC(3, 2) DEFAULT 0.25,
+    attendance_weight NUMERIC(3, 2) DEFAULT 0.20,
+    fun_weight NUMERIC(3, 2) DEFAULT 0.15,
+    team_spirit_weight NUMERIC(3, 2) DEFAULT 0.15,
+    created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
 
-CREATE POLICY "Team members are viewable by everyone"
-    ON team_members FOR SELECT
-    USING (true);
+/*
+ * Player badges table
+ * Stores badges earned by players
+ */
+CREATE TABLE player_badges (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    player_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+    badge_type TEXT NOT NULL CHECK (badge_type IN ('savior', 'top_scorer', 'team_player', 'mvp')),
+    match_id UUID REFERENCES matches(id) ON DELETE CASCADE,
+    awarded_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
 
-CREATE POLICY "Team managers can add members"
-    ON team_members FOR INSERT
-    WITH CHECK (
-        EXISTS (
-            SELECT 1 FROM teams
-            WHERE teams.id = team_members.team_id
-            AND (
-                teams.created_by = auth.uid()
-                OR EXISTS (
-                    SELECT 1 FROM team_members tm
-                    WHERE tm.team_id = team_members.team_id
-                    AND tm.user_id = auth.uid()
-                    AND tm.role = 'manager'
-                )
-            )
-        )
-    );
+/*
+ * Notification settings table
+ * Stores user notification preferences
+ */
+CREATE TABLE notification_settings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES profiles(id) ON DELETE CASCADE UNIQUE,
+    match_reminders BOOLEAN DEFAULT TRUE,
+    team_updates BOOLEAN DEFAULT TRUE,
+    rating_requests BOOLEAN DEFAULT TRUE,
+    emergency_notifications BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
 
--- Index pour améliorer les performances
-CREATE INDEX teams_created_by_idx ON teams(created_by);
-CREATE INDEX team_members_team_id_idx ON team_members(team_id);
-CREATE INDEX team_members_user_id_idx ON team_members(user_id);
+/*
+ * Emergency replacements table
+ * Stores emergency replacement requests
+ */
+CREATE TABLE emergency_replacements (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    match_id UUID REFERENCES matches(id) ON DELETE CASCADE,
+    player_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+    replacement_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'declined')),
+    created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+
+/*
+ * Function to automatically update 'updated_at' timestamp
+ * Used by all tables to track last modification time
+ */
+CREATE OR REPLACE FUNCTION update_modified_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Apply timestamp triggers to all tables
+CREATE TRIGGER update_profiles_modtime
+BEFORE UPDATE ON profiles
+FOR EACH ROW EXECUTE FUNCTION update_modified_column();
+
+CREATE TRIGGER update_teams_modtime
+BEFORE UPDATE ON teams
+FOR EACH ROW EXECUTE FUNCTION update_modified_column();
+
+CREATE TRIGGER update_matches_modtime
+BEFORE UPDATE ON matches
+FOR EACH ROW EXECUTE FUNCTION update_modified_column();
+
+CREATE TRIGGER update_tournaments_modtime
+BEFORE UPDATE ON tournaments
+FOR EACH ROW EXECUTE FUNCTION update_modified_column();
+
+CREATE TRIGGER update_player_stats_modtime
+BEFORE UPDATE ON player_stats
+FOR EACH ROW EXECUTE FUNCTION update_modified_column();

@@ -49,7 +49,7 @@ export const AnimatedTabIcon: React.FC<AnimatedTabIconProps> = ({
 
   return (
     <AnimatedIcon
-      name={name}
+      name={name as any}
       size={size}
       color={focused ? theme.colors.primary : theme.colors.outline}
       style={[styles.icon, animatedStyle]}

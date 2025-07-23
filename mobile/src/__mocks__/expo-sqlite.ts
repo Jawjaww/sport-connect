@@ -1,4 +1,5 @@
-import { SQLResultSet, SQLError } from '../types/sqlite';
+// Removed import statement due to the file not being a module
+// Import statement removed as per the instructions
 
 const mockRunAsync = jest.fn();
 const mockGetAllAsync = jest.fn();
@@ -8,7 +9,8 @@ const mockDatabaseSync = {
   getAllAsync: mockGetAllAsync,
 };
 
-const createMockResultSet = (rows: any[] = []): SQLResultSet => ({
+// Function to create a mock result set for SQLite operations
+const createMockResultSet = (rows: any[] = []): any => ({
   rows: {
     _array: rows,
     length: rows.length,
@@ -18,9 +20,9 @@ const createMockResultSet = (rows: any[] = []): SQLResultSet => ({
   rowsAffected: rows.length,
 });
 
-const createMockError = (message: string): SQLError => ({
+const createMockError = (message: string): Error => ({
+  name: 'MockError',
   message,
-  code: 0,
 });
 
 const mock = {

@@ -1,6 +1,6 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import type { TeamStackParamList } from '../types/navigation';
+import type { TeamStackParamList } from '../types/navigationTypes';
 import TeamScreen from '../screens/Team';
 import PlayerDetailsScreen from '../screens/Player/PlayerDetailsScreen';
 import EditPlayerScreen from '../screens/Team/EditPlayerScreen';

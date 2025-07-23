@@ -3,7 +3,7 @@ import { nanoid } from 'nanoid';
 
 export const generateInvitationCode = async (teamId: string) => {
   try {
-    const code = nanoid(8).toUpperCase(); // Génère un code de 8 caractères
+    const code = nanoid(8).toUpperCase(); // Generate a random 8 character code
     
     const { error } = await supabase
       .from('team_invitations')
@@ -12,7 +12,7 @@ export const generateInvitationCode = async (teamId: string) => {
           code,
           team_id: teamId,
           created_at: new Date().toISOString(),
-          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // Expire dans 7 jours
+          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days from now
         },
       ]);
 

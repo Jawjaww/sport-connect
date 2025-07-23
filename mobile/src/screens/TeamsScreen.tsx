@@ -3,15 +3,14 @@ import { View, StyleSheet, FlatList, RefreshControl } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Card, Title, Paragraph, Button, ActivityIndicator, Text } from 'react-native-paper';
 import { useTeam } from '../hooks/useTeam';
-import type { Team } from '../types/database';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { TeamStackParamList } from '../types/types';
+import type { TeamStackParamList, Team } from '../types/sharedTypes';
 
 type TeamsScreenNavigationProp = NativeStackNavigationProp<TeamStackParamList>;
 
 export const TeamsScreen: React.FC = () => {
   const navigation = useNavigation<TeamsScreenNavigationProp>();
-  const { userTeams } = useTeam();
+  const { userTeams } = useTeam('');
   const [refreshing, setRefreshing] = React.useState(false);
 
   const onRefresh = React.useCallback(async () => {

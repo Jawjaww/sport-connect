@@ -1,18 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, FlatList } from 'react-native';
-import {
-  Text,
-  List,
-  Avatar,
-  Button,
-  FAB,
-  useTheme,
-  IconButton,
-  Menu,
-  Divider,
-} from 'react-native-paper';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { Text, List, Avatar, Menu, Divider, useTheme, Icon } from 'react-native-paper';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { TeamStackParamList, TeamMember, User } from '../../types';
+import { TeamStackParamList } from '../../types/navigationTypes';
+import { TeamMember, User } from '../../types/sharedTypes';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -22,7 +13,7 @@ interface MemberWithUser extends TeamMember {
   user: User;
 }
 
-const TeamMembersScreen: React.FC<Props> = ({ route, navigation }) => {
+const TeamMembersScreen: React.FC<Props> = ({ route }) => {
   const { teamId } = route.params;
   const theme = useTheme();
   const { user } = useAuth();
@@ -35,6 +26,7 @@ const TeamMembersScreen: React.FC<Props> = ({ route, navigation }) => {
     loadMembers();
     checkManagerStatus();
   }, []);
+
 
   const loadMembers = async () => {
     try {
@@ -52,7 +44,10 @@ const TeamMembersScreen: React.FC<Props> = ({ route, navigation }) => {
         .eq('team_id', teamId)
         .is('left_at', null);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error loading team members:', error);
+        return;
+      }
       setMembers(data as MemberWithUser[]);
     } catch (error) {
       console.error('Error loading team members:', error);
@@ -94,7 +89,7 @@ const TeamMembersScreen: React.FC<Props> = ({ route, navigation }) => {
     }
   };
 
-  const handleChangeRole = async (memberId: string, newRole: string) => {
+  const handleChangeRole = async (memberId: string, newRole: TeamMember['role']) => {
     try {
       const { error } = await supabase
         .from('team_members')
@@ -103,89 +98,80 @@ const TeamMembersScreen: React.FC<Props> = ({ route, navigation }) => {
 
       if (error) throw error;
       loadMembers();
+      setMenuVisible(null);
     } catch (error) {
       console.error('Error changing role:', error);
     }
   };
 
-  const renderMemberItem = ({ item }: { item: MemberWithUser }) => (
-    <List.Item
-      title={item.user.username}
-      description={item.role.charAt(0).toUpperCase() + item.role.slice(1)}
-      left={() => (
-        <Avatar.Image
-          size={40}
-          source={
-            item.user.avatar_url
-              ? { uri: item.user.avatar_url }
-              : { uri: 'https://via.placeholder.com/100x100.png?text=Avatar' }
-          }
-        />
-      )}
-      right={() =>
-        isManager && item.user_id !== user?.id ? (
-          <Menu
-            visible={menuVisible === item.id}
-            onDismiss={() => setMenuVisible(null)}
-            anchor={
-              <IconButton
-                icon="dots-vertical"
-                onPress={() => setMenuVisible(item.id)}
-              />
-            }
-          >
-            <Menu.Item
-              onPress={() => {
-                handleChangeRole(item.id, 'player');
-                setMenuVisible(null);
-              }}
-              title="Définir comme joueur"
-            />
-            <Menu.Item
-              onPress={() => {
-                handleChangeRole(item.id, 'coach');
-                setMenuVisible(null);
-              }}
-              title="Définir comme coach"
-            />
-            <Menu.Item
-              onPress={() => {
-                handleChangeRole(item.id, 'manager');
-                setMenuVisible(null);
-              }}
-              title="Définir comme manager"
-            />
-            <Divider />
-            <Menu.Item
-              onPress={() => {
-                handleRemoveMember(item.id);
-                setMenuVisible(null);
-              }}
-              title="Retirer de l'équipe"
-              titleStyle={{ color: theme.colors.error }}
-            />
-          </Menu>
-        ) : null
-      }
-    />
-  );
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <Text>Chargement...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <FlatList
-        data={members}
-        renderItem={renderMemberItem}
-        keyExtractor={(item) => item.id}
-        ItemSeparatorComponent={Divider}
-        ListHeaderComponent={
-          <View style={styles.header}>
-            <Text variant="titleMedium" style={styles.title}>
-              Membres de l'équipe ({members.length})
-            </Text>
-          </View>
-        }
-      />
+      <List.Section>
+        <List.Subheader>Membres de l'équipe ({members.length})</List.Subheader>
+        {members.map((member) => (
+          <List.Item
+            key={member.id}
+            title={member.user.username}
+            description={member.role.charAt(0).toUpperCase() + member.role.slice(1)}
+            left={() => (
+              <Avatar.Image
+                size={40}
+                source={
+                  member.user.avatar_url
+                    ? { uri: member.user.avatar_url }
+                    : { uri: 'https://via.placeholder.com/100x100.png?text=Avatar' }
+                }
+              />
+            )}
+            right={() =>
+              isManager && member.user_id !== user?.id ? (
+                <Menu
+                  visible={menuVisible === member.id}
+                  onDismiss={() => setMenuVisible(null)}
+                  anchor={
+                    <TouchableOpacity 
+                      onPress={() => setMenuVisible(member.id)}
+                      style={{ padding: 8 }}
+                      accessibilityRole="button"
+                    >
+                      <Icon source="dots-vertical" size={24} />
+                    </TouchableOpacity>
+                  }
+                >
+                  <Menu.Item
+                    onPress={() => handleChangeRole(member.id, 'player')}
+                    title="Définir comme joueur"
+                  />
+                  <Menu.Item
+                    onPress={() => handleChangeRole(member.id, 'coach')}
+                    title="Définir comme coach"
+                  />
+                  <Menu.Item
+                    onPress={() => handleChangeRole(member.id, 'manager')}
+                    title="Définir comme manager"
+                  />
+                  <Divider />
+                  <Menu.Item
+                    onPress={() => handleRemoveMember(member.id)}
+                    title="Retirer de l'équipe"
+                    titleStyle={{ color: theme.colors.error }}
+                  />
+                </Menu>
+              ) : null
+            }
+          />
+        ))}
+      </List.Section>
     </View>
+
   );
 };
 
@@ -193,13 +179,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-  },
-  header: {
-    padding: 16,
-    backgroundColor: '#fff',
-  },
-  title: {
-    opacity: 0.7,
   },
 });
 

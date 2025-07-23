@@ -26,6 +26,9 @@
       },
       "package": "com.sportconnect.app"
     },
+    "web": {
+      "favicon": "./src/assets/favicon.png"
+    },
     "plugins": [],
     "experiments": {
       "tsconfigPaths": true

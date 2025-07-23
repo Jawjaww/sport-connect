@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { RootStackScreenProps } from '../../types/navigation';
+import { RootStackScreenProps } from '../../types/navigationTypes';
 
 type Props = RootStackScreenProps<'EditPlayer'>;
 

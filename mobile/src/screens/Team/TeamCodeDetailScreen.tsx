@@ -3,9 +3,10 @@ import { View, StyleSheet, ScrollView } from 'react-native';
 import { Text, Button, Card, ActivityIndicator } from 'react-native-paper';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../types/navigation';
+import { RootStackParamList } from '../../types/navigationTypes';
 import { useTeams } from '../../hooks/useTeams';
 import TeamCodeComponent from './TeamCodeComponent';
+import { Team, TeamCode } from '../../types/sharedTypes'; 
 
 type TeamCodeDetailScreenRouteProp = RouteProp<RootStackParamList, 'TeamCodeDetail'>;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -27,7 +28,7 @@ const TeamCodeDetailScreen: React.FC = () => {
   if (error) {
     return (
       <View style={styles.centered}>
-        <Text style={styles.errorText}>Erreur de chargement: {error.message}</Text>
+        <Text style={styles.errorText}>Erreur de chargement: {typeof error === 'string' ? error : error?.message}</Text>
         <Button 
           mode="outlined" 
           style={styles.backButton}

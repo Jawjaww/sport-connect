@@ -1,176 +1,76 @@
 import { supabase } from './supabase';
-import { runAsync, getFirstAsync, getAllAsync } from '../utils/sqlite';
-import type { Team, CreateTeamRequest, SyncableTeam } from '../types';
-import * as Network from 'expo-network';
-import * as Sharing from 'expo-sharing';
-import * as Clipboard from 'expo-clipboard';
-import { Alert } from 'react-native';
-import { v4 as uuidv4 } from 'uuid';
-import * as SQLite from 'expo-sqlite';
+import { logger } from '../utils/logger';
+import { synchronize } from '@nozbe/watermelondb/sync';
+import { database } from '../database/database';
 
-export class SyncService {
-  private static instance: SyncService;
-  private syncQueue: SyncableTeam[] = [];
-  private syncInterval!: NodeJS.Timeout;
+class SyncService {
+  private static instance: SyncService | null = null;
 
-  static readonly SYNC_INTERVAL = 30000; // 30 secondes
-  static readonly MAX_SYNC_ATTEMPTS = 3;
+  private constructor() {}
 
-  private constructor() {
-    this.initializeSyncInterval();
-  }
-
-  public static getInstance(): SyncService {
-    if (!SyncService.instance) {
-      SyncService.instance = new SyncService();
+  static getInstance(): SyncService {
+    if (!this.instance) {
+      this.instance = new SyncService();
     }
-    return SyncService.instance;
+    return this.instance;
   }
 
-  private initializeSyncInterval(): void {
-    this.syncInterval = setInterval(
-      () => this.processSyncQueue(), 
-      SyncService.SYNC_INTERVAL
-    );
-  }
-
-  public queueForSync(team: SyncableTeam): void {
-    const existingTeamIndex = this.syncQueue.findIndex(t => t.id === team.id);
-    
-    const syncableTeam: SyncableTeam = {
-      ...team,
-      syncAttempts: 0,
-      lastSyncTimestamp: Date.now()
-    };
-
-    if (existingTeamIndex !== -1) {
-      this.syncQueue[existingTeamIndex] = {
-        ...this.syncQueue[existingTeamIndex],
-        ...syncableTeam
-      };
-    } else {
-      this.syncQueue.push(syncableTeam);
-    }
-  }
-
-  private async processSyncQueue(): Promise<void> {
+  async synchronize(): Promise<void> {
     try {
-      const networkState = await Network.getNetworkStateAsync();
-      if (!networkState.isConnected) return;
+      await synchronize({
+        database,
+        pullChanges: async ({ lastPulledAt }) => {
+          const { data: teamsData, error: teamsError } = await supabase
+            .from('teams')
+            .select('*')
+            .gt('updated_at', lastPulledAt || 0);
 
-      const itemsToSync = this.syncQueue.splice(0, 5);
-
-      for (const team of itemsToSync) {
-        try {
-          if (team.deleted) {
-            await this.deleteTeam(team);
-          } else {
-            await this.upsertTeam(team);
+          if (teamsError) {
+            logger.error('Error fetching teams from Supabase', { error: teamsError });
+            throw teamsError;
           }
 
-          // Broadcast an event to notify listeners about sync completion
-          const event = { type: 'teamSynced', detail: team };
-          (globalThis as any).dispatchEvent(event);
-        } catch (error) {
-          this.handleSyncError(team, error);
+          const updatedTeams = teamsData.filter(team => team.updated_at > (lastPulledAt || 0));
+          const deletedTeams: string[] = [];
+
+          return {
+            changes: {
+              teams: {
+                updated: updatedTeams,
+                deleted: deletedTeams,
+                created: teamsData
+              }
+            },
+            timestamp: new Date().getTime()
+          };
+        },
+        pushChanges: async ({ changes, lastPulledAt }) => {
+          const { teams } = changes;
+
+          if (teams.created?.length) {
+            await supabase.from('teams').insert(teams.created);
+          }
+          if (teams.updated?.length) {
+            for (const team of teams.updated) {
+              await supabase
+                .from('teams')
+                .update(team)
+                .eq('id', team.id);
+            }
+          }
+          if (teams.deleted?.length) {
+            await supabase
+              .from('teams')
+              .delete()
+              .in('id', teams.deleted);
+          }
         }
-      }
+      });
+      logger.info('Synchronization completed successfully');
     } catch (error) {
-      console.error('Sync queue processing error:', error);
-    }
-  }
-
-  private async deleteTeam(team: SyncableTeam): Promise<void> {
-    await supabase.from('teams').delete().eq('id', team.id);
-  }
-
-  private async upsertTeam(team: SyncableTeam): Promise<void> {
-    const { data, error } = await supabase.from('teams').upsert(
-      [team], 
-      { 
-        onConflict: 'id',
-        defaultToNull: false 
-      }
-    );
-
-    if (error) {
-      console.error('Upsert team error:', error);
+      logger.error('Error during synchronization', { error });
       throw error;
     }
-
-    // Trigger a local database update
-    await this.updateLocalDatabase(team);
-  }
-
-  private async updateLocalDatabase(team: SyncableTeam): Promise<void> {
-    const db = SQLite.openDatabaseSync('sportconnect.db');
-    try {
-      await db.runAsync(
-        'INSERT INTO teams (id, name, description, sport, team_code, created_at, owner_id, players, status, updated_at, logo_url, location) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [
-          team.id,
-          team.name,
-          team.description || '',
-          team.sport,
-          team.team_code || '',
-          team.created_at || '',
-          team.owner_id || '',
-          JSON.stringify(team.players) || '[]',
-          team.status || '',
-          team.updated_at || '',
-          team.logo_url || '',
-          JSON.stringify(team.location) || '{}',
-        ]
-      );
-    } catch (error) {
-      console.error('Error updating local database:', error);
-    }
-  }
-
-  private handleSyncError(team: SyncableTeam, error: unknown): void {
-    const attempts = (team.syncAttempts || 0) + 1;
-    
-    console.warn(`Sync failed for team ${team.id}:`, error);
-    
-    if (attempts < SyncService.MAX_SYNC_ATTEMPTS) {
-      team.syncAttempts = attempts;
-      this.syncQueue.push(team);
-    }
-  }
-
-  public async shareTeamCode(teamCode: string): Promise<void> {
-    try {
-      const shareLink = `sportconnect://join-team/${teamCode}`;
-
-      const isAvailable = await Sharing.isAvailableAsync();
-      if (isAvailable) {
-        await Sharing.shareAsync(shareLink, {
-          dialogTitle: 'Partager le code d\'équipe',
-          mimeType: 'text/plain'
-        });
-      } else {
-        await Clipboard.setStringAsync(shareLink);
-        Alert.alert(
-          'Lien copié', 
-          'Le lien de partage a été copié dans le presse-papiers.'
-        );
-      }
-    } catch (error) {
-      console.error('Team Code Sharing Error:', error);
-      Alert.alert('Erreur', 'Impossible de partager le code d\'équipe');
-    }
-  }
-
-  public stopSync(): void {
-    clearInterval(this.syncInterval);
-  }
-
-  public clearSyncQueue(): void {
-    this.syncQueue = [];
-  }
-
-  public getSyncQueueLength(): number {
-    return this.syncQueue.length;
   }
 }
 

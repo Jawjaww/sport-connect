@@ -1,13 +1,13 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useTheme } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AnimatedTabIcon from '../components/AnimatedTabIcon';
-import { MainTabParamList } from '../types';
+import { MainTabParamList } from '../types/navigationTypes';
 
 // Screens
-import HomeScreen from '../screens/Home';
+import HomeScreen from '../screens/Home/HomeScreen';
 import TeamScreen from '../screens/Team';
 import TournamentsScreen from '../screens/Tournaments';
 import StatisticsScreen from '../screens/Statistics';

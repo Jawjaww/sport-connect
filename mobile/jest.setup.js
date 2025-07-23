@@ -1,46 +1,75 @@
 import 'react-native-gesture-handler/jestSetup';
 import '@testing-library/jest-native/extend-expect';
+import { render } from '@testing-library/react-native';
 
-// Mock Animated
-jest.mock('react-native/Libraries/Animated/AnimatedImplementation', () => {
-  const ActualAnimated = jest.requireActual('react-native/Libraries/Animated/AnimatedImplementation');
+// Add cleanup after each test
+afterEach(() => {
+  render.cleanup();
+});
+
+// Mock React Native core modules
+jest.mock('react-native', () => {
+  const RN = jest.requireActual('react-native');
+  
   return {
-    ...ActualAnimated,
-    timing: () => ({
-      start: jest.fn(),
-      stop: jest.fn(),
+    ...RN,
+    NativeModules: {
+      ...RN.NativeModules,
+    },
+    Platform: {
+      ...RN.Platform,
+      OS: 'ios',
+      Version: 16,
+      isTesting: true,
+      select: jest.fn((obj) => obj.ios),
+    },
+    Animated: {
+      ...RN.Animated,
+      Value: jest.fn(),
+      timing: jest.fn(),
+      spring: jest.fn(),
+      decay: jest.fn(),
+      sequence: jest.fn(),
+      parallel: jest.fn(),
+      createAnimatedComponent: jest.fn((Component) => Component)
+    }
+  };
+});
+
+// Mock deprecated modules
+jest.mock('@react-native-clipboard/clipboard', () => ({
+  setString: jest.fn(),
+  getString: jest.fn(),
+}));
+
+jest.mock('@react-native-community/push-notification-ios', () => ({
+  addEventListener: jest.fn(),
+  requestPermissions: jest.fn(),
+}));
+
+// Mock react-native-reanimated
+jest.mock('react-native-reanimated', () => {
+  const Reanimated = require('react-native-reanimated/mock');
+  Reanimated.default.call = () => {};
+  return Reanimated;
+});
+
+// Mock @react-navigation/native
+jest.mock('@react-navigation/native', () => {
+  return {
+    ...jest.requireActual('@react-navigation/native'),
+    useNavigation: () => ({
+      navigate: jest.fn(),
     }),
-    spring: () => ({
-      start: jest.fn(),
-      stop: jest.fn(),
-    }),
-    decay: () => ({
-      start: jest.fn(),
-      stop: jest.fn(),
-    }),
-    sequence: jest.fn(),
-    parallel: jest.fn(),
   };
 });
 
 // Mock SQLite
-const mockExecuteSql = jest.fn();
-const mockTransaction = jest.fn((callback) => {
-  callback({ executeSql: mockExecuteSql });
-  return Promise.resolve();
-});
-
 jest.mock('expo-sqlite', () => ({
   openDatabase: jest.fn(() => ({
-    transaction: mockTransaction,
-    readTransaction: mockTransaction,
+    transaction: jest.fn(),
+    readTransaction: jest.fn(),
   })),
-  SQLite: {
-    openDatabase: jest.fn(() => ({
-      transaction: mockTransaction,
-      readTransaction: mockTransaction,
-    })),
-  },
 }));
 
 // Mock AsyncStorage
@@ -58,43 +87,33 @@ jest.mock('@supabase/supabase-js', () => ({
       signIn: jest.fn(),
       signOut: jest.fn(),
       session: jest.fn(),
+      onAuthStateChange: jest.fn(),
+      user: jest.fn(),
     },
-    from: jest.fn(),
+    from: jest.fn(() => ({
+      select: jest.fn().mockReturnThis(),
+      insert: jest.fn().mockReturnThis(),
+      update: jest.fn().mockReturnThis(),
+      delete: jest.fn().mockReturnThis(),
+      single: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+    })),
   })),
-}));
-
-// Mock Supabase services
-jest.mock('./src/services/supabase', () => ({
-  supabase: {
-    from: jest.fn().mockReturnThis(),
-    select: jest.fn().mockReturnThis(),
-    insert: jest.fn().mockReturnThis(),
-    upsert: jest.fn().mockReturnThis(),
-    single: jest.fn().mockReturnThis(),
-    eq: jest.fn().mockReturnThis(),
-  },
-  auth: {
-    getUser: jest.fn().mockResolvedValue({ 
-      data: { 
-        user: { 
-          id: 'test-user-id' 
-        } 
-      } 
-    })
-  }
-}));
-
-// Mock SQLite services
-jest.mock('./src/services/sqlite.service', () => ({
-  runAsync: jest.fn(),
-  getAllAsync: jest.fn(),
-  saveTeamCode: jest.fn(),
-  getTeamCode: jest.fn()
 }));
 
 // Mock Alert
 jest.mock('react-native/Libraries/Alert/Alert', () => ({
   alert: jest.fn(),
+}));
+
+// Mock expo-constants
+jest.mock('expo-constants', () => ({
+  expoConfig: {
+    extra: {
+      supabaseUrl: 'http://localhost:8000',
+      supabaseAnonKey: 'test-key'
+    }
+  }
 }));
 
 // Mock expo-secure-store
@@ -103,13 +122,6 @@ jest.mock('expo-secure-store', () => ({
   setItemAsync: jest.fn(),
   deleteItemAsync: jest.fn(),
 }));
-
-// Mock react-native-reanimated
-jest.mock('react-native-reanimated', () => {
-  const Reanimated = require('react-native-reanimated/mock');
-  Reanimated.default.call = () => {};
-  return Reanimated;
-});
 
 // Ignore specific warnings
 const originalConsoleError = console.error;

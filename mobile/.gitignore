@@ -22,6 +22,10 @@ yarn-error.*
 .env
 .env.*
 !.env.example
+!.env.firebase.example
+.env.local
+.env.production.local
+.env.development.local
 
 # TypeScript
 *.tsbuildinfo
@@ -43,9 +47,10 @@ ios/Pods/
 *.xcuserstate
 xcuserdata/
 
-# Firebase
+# Firebase - Keep these files secret!
 google-services.json
 GoogleService-Info.plist
+*.backup
 
 # Testing
 coverage/

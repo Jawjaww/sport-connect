@@ -1,8 +1,8 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { IconButton } from 'react-native-paper';
-import type { HomeStackParamList } from '../types/navigation';
-import HomeScreen from '../screens/Home';
+import type { HomeStackParamList } from '../types/navigationTypes';
+import HomeScreen from '../screens/Home/HomeScreen';
 import MatchDetailsScreen from '../screens/Match/MatchDetailsScreen';
 import TournamentDetailsScreen from '../screens/Tournament/TournamentDetailsScreen';
 import TeamCreationScreen from '../screens/Team/TeamCreationScreen';
@@ -11,12 +11,20 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 const Stack = createNativeStackNavigator<HomeStackParamList>();
 
+// Define props for each screen
+export type HomeScreenProps = NativeStackScreenProps<HomeStackParamList, 'Home'>;
+export type MatchDetailsScreenProps = NativeStackScreenProps<HomeStackParamList, 'MatchDetails'>;
+export type TournamentDetailsScreenProps = NativeStackScreenProps<HomeStackParamList, 'TournamentDetails'>;
+export type TeamCreationScreenProps = NativeStackScreenProps<HomeStackParamList, 'TeamCreation'>;
+export type ProfileScreenProps = NativeStackScreenProps<HomeStackParamList, 'Profile'>;
+
 const HomeNavigator = () => {
+  console.log('HomeNavigator accessed');
   return (
     <Stack.Navigator>
       <Stack.Screen
-        name="HomeMain"
-        component={HomeScreen as any} 
+        name="Home"
+        component={HomeScreen}
         options={({ navigation }) => ({
           title: 'Accueil',
           headerRight: () => (

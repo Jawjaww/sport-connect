@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import type { RootStackScreenProps } from '../types/navigation';
+import type { RootStackScreenProps } from '../types/navigationTypes';
 import { MaterialIcons } from '@expo/vector-icons';
 
 type Props = RootStackScreenProps<'Home'>;

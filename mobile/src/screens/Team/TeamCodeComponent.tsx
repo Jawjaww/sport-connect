@@ -4,30 +4,23 @@ import { Text, Button, Dialog, Portal } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-import { RootStackParamList } from '../../types/navigation';
-import { getTeamCode, regenerateTeamCode, shareTeamCode } from '../../services/team.service';
+import { RootStackParamList } from '../../types/navigationTypes';
+import { teamService } from '../../services/team.service';
 import { shareContent } from '../../utils/sharing';
+import { TeamCodeComponentProps } from '../../types/sharedTypes'; 
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-type TeamCodeComponentProps = {
-  teamId: string;
-  mode?: 'section' | 'dialog';
-};
-
-const TeamCodeComponent: React.FC<TeamCodeComponentProps> = ({ 
-  teamId, 
-  mode = 'section' 
-}) => {
+const TeamCodeComponent: React.FC<TeamCodeComponentProps> = ({ teamId, mode }) => {
   const navigation = useNavigation<NavigationProp>();
   const [teamCode, setTeamCode] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [dialogVisible, setDialogVisible] = useState(false);
+  const [currentMode, setCurrentMode] = useState<'view' | 'edit' | 'section'>('section');
 
   useEffect(() => {
     const fetchTeamCode = async () => {
       try {
-        const code = await getTeamCode(teamId);
+        const { data: code } = await teamService.getTeamCodeDetails(teamId);
         setTeamCode(code);
       } catch (error) {
         console.error('[TeamCodeComponent] Error:', error);
@@ -40,7 +33,7 @@ const TeamCodeComponent: React.FC<TeamCodeComponentProps> = ({
   const handleRegenerateCode = async () => {
     try {
       setIsLoading(true);
-      const result = await regenerateTeamCode(teamId);
+      const { data: result } = await teamService.regenerateTeamCode(teamId);
       
       if (result) {
         setTeamCode(result);
@@ -53,7 +46,6 @@ const TeamCodeComponent: React.FC<TeamCodeComponentProps> = ({
       Alert.alert('Erreur', 'Une erreur est survenue lors de la régénération du code');
     } finally {
       setIsLoading(false);
-      setDialogVisible(false);
     }
   };
 
@@ -64,12 +56,13 @@ const TeamCodeComponent: React.FC<TeamCodeComponentProps> = ({
     }
 
     try {
-      const { teamCode: code, shareLink } = await shareTeamCode(teamId);
+      const result = await teamService.shareTeamCode(teamId);
+      const { teamCode: code, shareLink } = result; // Assurez-vous que result a ces propriétés
       
       if (code && shareLink) {
         await shareContent(shareLink, 'Partager le code d\'équipe');
       } else {
-        Alert.alert('Erreur', 'Impossible de générer un lien de partage');
+        console.error('teamCode or shareLink is undefined');
       }
     } catch (error) {
       console.error('Erreur lors du partage du code :', error);
@@ -78,14 +71,14 @@ const TeamCodeComponent: React.FC<TeamCodeComponentProps> = ({
   };
 
   const handleCodePress = () => {
-    navigation.navigate('TeamCodeDetail', { teamId });
+    navigation.navigate('TeamCodeDetail', { teamId, teamCode: String(teamCode) });
   };
 
   const renderSection = () => (
     <TouchableOpacity 
       style={styles.codeContainer} 
       onPress={handleCodePress}
-      onLongPress={() => setDialogVisible(true)}
+      onLongPress={handleRegenerateCode}
     >
       <Text style={styles.codeLabel}>Code d'équipe</Text>
       <Text style={styles.codeText}>{teamCode || 'Non généré'}</Text>
@@ -94,7 +87,7 @@ const TeamCodeComponent: React.FC<TeamCodeComponentProps> = ({
 
   const renderDialog = () => (
     <Portal>
-      <Dialog visible={dialogVisible} onDismiss={() => setDialogVisible(false)}>
+      <Dialog visible={true}>
         <Dialog.Title>Code d'équipe</Dialog.Title>
         <Dialog.Content>
           <View style={styles.dialogContent}>
@@ -112,7 +105,6 @@ const TeamCodeComponent: React.FC<TeamCodeComponentProps> = ({
           >
             Partager
           </Button>
-          <Button onPress={() => setDialogVisible(false)}>Fermer</Button>
         </Dialog.Actions>
       </Dialog>
     </Portal>
@@ -120,7 +112,7 @@ const TeamCodeComponent: React.FC<TeamCodeComponentProps> = ({
 
   return (
     <>
-      {mode === 'section' ? renderSection() : renderDialog()}
+      {currentMode === 'section' ? renderSection() : renderDialog()}
     </>
   );
 };

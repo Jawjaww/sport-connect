@@ -17,7 +17,8 @@ import {
   SegmentedButtons,
 } from 'react-native-paper';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { TeamStackParamList, Player } from '../../types';
+import { TeamStackParamList } from '../../types';
+import { Player } from '../../types/sharedTypes'; // Modifié pour correspondre aux nouvelles exportations
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import * as ImagePicker from 'expo-image-picker';

@@ -11,7 +11,7 @@ const TournamentsScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Tournaments</Text>
+      <Text style={styles.title}>Tournaments Coming Soon</Text>
       {/* Add tournament list and functionality here */}
     </View>
   );

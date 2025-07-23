@@ -5,7 +5,7 @@
     "baseUrl": ".",
     "lib": ["ES2021", "ES2020.Promise", "ES2020.String", "ES2020.Symbol.WellKnown"],
     "paths": {
-      "@/*": ["src/*"],
+      "*": ["src/*"],
       "@components/*": ["src/components/*"],
       "@screens/*": ["src/screens/*"],
       "@navigation/*": ["src/navigation/*"],
@@ -16,7 +16,7 @@
       "@hooks/*": ["src/hooks/*"],
       "@assets/*": ["src/assets/*"]
     },
-    "types": ["react-native", "jest"],
+    "types": ["react-native", "jest", "node"],
     "allowJs": true,
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
@@ -27,7 +27,10 @@
     "noEmit": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
-    "target": "ES2021"
+    "target": "ES2021",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "useDefineForClassFields": true
   },
   "exclude": [
     "node_modules",

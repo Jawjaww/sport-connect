@@ -1,74 +1,24 @@
 import React from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
-import { Text, ActivityIndicator, Card } from 'react-native-paper';
-import { RootStackScreenProps } from '../../types/navigation';
+import { View, Text } from 'react-native';
 import { useTeams } from '../../hooks/useTeams';
-import TeamCodeComponent from './TeamCodeComponent';
+import { Team } from '../../types/sharedTypes';
 
-type Props = RootStackScreenProps<'TeamMain'>;
+const TeamScreen = () => {
+  const { teams, isLoading, error } = useTeams();
 
-export default function TeamScreen({ route }: Props) {
-  const { teamId } = route.params;
-  const { currentTeam, loading, error } = useTeams(teamId);
-
-  if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator animating={true} />
-      </View>
-    );
-  }
-
-  if (error) {
-    return (
-      <View style={styles.centered}>
-        <Text style={styles.errorText}>Erreur de chargement: {error.message}</Text>
-      </View>
-    );
-  }
-
-  if (!currentTeam) {
-    return (
-      <View style={styles.centered}>
-        <Text>Équipe non trouvée</Text>
-      </View>
-    );
-  }
+  if (isLoading) return <Text>Loading...</Text>;
+  if (error) return <Text>Error loading teams</Text>;
 
   return (
-    <ScrollView style={styles.container}>
-      <Card>
-        <Card.Title 
-          title={currentTeam.name} 
-          subtitle={currentTeam.sport || 'Sport non spécifié'} 
-        />
-        <Card.Content>
-          {currentTeam.description && (
-            <Text>{currentTeam.description}</Text>
-          )}
-          {currentTeam.location && (
-            <Text>Localisation: {currentTeam.location}</Text>
-          )}
-        </Card.Content>
-      </Card>
-
-      <TeamCodeComponent teamId={teamId} />
-    </ScrollView>
+    <View>
+      {teams && teams.map((team: Team) => (
+        <View key={team.id}>
+          <Text>{team.name}</Text>
+          <Text>{team.description}</Text>
+        </View>
+      ))}
+    </View>
   );
-}
+};
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorText: {
-    color: 'red',
-    textAlign: 'center',
-  },
-});
+export default TeamScreen;

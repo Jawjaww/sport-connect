@@ -1,0 +1,35 @@
+{
+  "cli": {
+    "appVersionSource": "local"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "gradleCommand": ":app:assembleDebug"
+      },
+      "env": {
+        "ENVIRONMENT": "development",
+        "SUPABASE_URL": "$SUPABASE_URL",
+        "SUPABASE_ANON_KEY": "$SUPABASE_ANON_KEY",
+        "FCM_ENABLED": "false",
+        "GOOGLE_SERVICES_JSON": "$GOOGLE_SERVICES_JSON",
+        "GOOGLE_SERVICE_INFO_PLIST": "$GOOGLE_SERVICE_INFO_PLIST",
+        "ANDROID_HOME": "/Users/beij/Library/Android/sdk",
+        "JAVA_HOME": "/opt/homebrew/Cellar/openjdk@17/17.0.16/libexec/openjdk.jdk/Contents/Home"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "ENVIRONMENT": "preview"
+      }
+    },
+    "production": {
+      "env": {
+        "ENVIRONMENT": "production"
+      }
+    }
+  }
+}

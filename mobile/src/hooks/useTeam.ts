@@ -1,46 +1,45 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { TeamService } from '../services/team.service';
 import { supabase } from '../services/supabase';
-import type {
-  CreateTeamRequest,
-  UpdateTeamRequest,
-  CreatePlayerRequest,
-  UpdatePlayerRequest,
-  Team,
-  TeamStatus
-} from '../types/database';
+import { CreateTeamRequest, UpdateTeamRequest, Team, Player } from '../types/sharedTypes';
+import { teamService } from '../services/team.service';
 
-export const useTeam = () => {
+export interface CreatePlayerRequest {
+  name: string;
+  position?: string;
+  number?: string;
+  status?: 'active' | 'inactive';
+}
+
+export interface UpdatePlayerRequest extends Partial<CreatePlayerRequest> {
+  id: string;
+  name: string;
+}
+
+export const useTeam = (teamId: string) => {
   const queryClient = useQueryClient();
 
   // Queries
   const userTeams = useQuery({
     queryKey: ['teams'],
     queryFn: async () => {
-      const teams = await TeamService.getUserTeams();
-      return teams.map(team => ({
+      const { data, error } = await teamService.getAllTeams();
+      if (error) throw new Error(error);
+      return data?.map(team => ({
         ...team,
         players: team.players || []
-      }));
+      })) || [];
     }
   });
 
-  const getTeam = (teamId: string) => useQuery({
-    queryKey: ['teams', teamId],
-    queryFn: async () => {
-      const team = await TeamService.getTeam(teamId);
-      return {
-        ...team,
-        players: team.players || []
-      };
-    },
-    enabled: !!teamId
+  const { data: team, isLoading: isTeamLoading } = useQuery({
+    queryKey: ['team', teamId],
+    queryFn: () => teamService.getTeamById(teamId),
   });
 
-  const getTeamMembers = (teamId: string) => useQuery({
-    queryKey: ['teams', teamId, 'members'],
-    queryFn: () => TeamService.getTeamMembers(teamId),
-    enabled: !!teamId
+  const { data: members = [], isLoading: isMembersLoading } = useQuery({
+    queryKey: ['team-members', teamId],
+    queryFn: () => teamService.getTeamPlayers(teamId),
+    enabled: !!teamId,
   });
 
   // Mutations
@@ -48,7 +47,7 @@ export const useTeam = () => {
     mutationFn: async (data: CreateTeamRequest) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
-      return TeamService.createTeam(data, user.id);
+      return teamService.createTeam(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['teams'] });
@@ -57,7 +56,7 @@ export const useTeam = () => {
 
   const updateTeam = useMutation({
     mutationFn: async ({ teamId, data }: { teamId: string; data: UpdateTeamRequest }) => {
-      return TeamService.updateTeam(teamId, data);
+      return teamService.updateTeam(teamId, data);
     },
     onSuccess: (_, { teamId }) => {
       queryClient.invalidateQueries({ queryKey: ['teams', teamId] });
@@ -66,58 +65,78 @@ export const useTeam = () => {
   });
 
   const addPlayer = useMutation({
-    mutationFn: async ({ teamId, data }: { teamId: string; data: CreatePlayerRequest }) => {
-      return TeamService.addPlayer(teamId, data);
+    mutationFn: (playerData: CreatePlayerRequest) => {
+      if (!team) throw new Error('Team not found');
+      return teamService.createTeamPlayer(teamId, playerData);
     },
-    onSuccess: (_, { teamId }) => {
-      queryClient.invalidateQueries({ queryKey: ['teams', teamId] });
-      queryClient.invalidateQueries({ queryKey: ['teams', teamId, 'members'] });
-    }
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['team-members', teamId] });
+    },
   });
 
   const updatePlayer = useMutation({
-    mutationFn: async ({ teamId, playerId, data }: { teamId: string; playerId: string; data: UpdatePlayerRequest }) => {
-      return TeamService.updatePlayer(teamId, playerId, data);
+    mutationFn: ({ playerId, updates }: { playerId: string; updates: UpdatePlayerRequest }) => {
+      if (!team) throw new Error('Team not found');
+      if (!updates.name) throw new Error('Player name is required');
+      return teamService.updateTeamPlayer(teamId, playerId, updates);
     },
-    onSuccess: (_, { teamId }) => {
-      queryClient.invalidateQueries({ queryKey: ['teams', teamId] });
-      queryClient.invalidateQueries({ queryKey: ['teams', teamId, 'members'] });
-    }
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['team-members', teamId] });
+    },
   });
 
   const removePlayer = useMutation({
-    mutationFn: async ({ teamId, playerId }: { teamId: string; playerId: string }) =>
-      TeamService.removePlayer(teamId, playerId),
-    onSuccess: (_, { teamId }) => {
-      queryClient.invalidateQueries({ queryKey: ['teams', teamId, 'members'] });
-    }
+    mutationFn: (playerId: string) => {
+      if (!team) throw new Error('Team not found');
+      return teamService.deleteTeamPlayer(teamId, playerId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['team-members', teamId] });
+    },
   });
 
-  const joinTeamWithCode = useMutation({
-    mutationFn: (code: string) => TeamService.joinTeamWithCode(code),
+  const joinTeam = useMutation({
+    mutationFn: (code: string) => {
+      return teamService.joinTeam(teamId, code);
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['teams'] });
-    }
+      queryClient.invalidateQueries({ queryKey: ['team-members', teamId] });
+    },
   });
 
   const handleJoinRequest = useMutation({
-    mutationFn: ({ teamId, userId, accept }: { teamId: string; userId: string; accept: boolean }) =>
-      TeamService.handleJoinRequest(teamId, userId, accept),
-    onSuccess: (_, { teamId }) => {
-      queryClient.invalidateQueries({ queryKey: ['teams', teamId, 'members'] });
-    }
+    mutationFn: ({ userId, status }: { userId: string; status: 'accepted' | 'rejected' }) => {
+      if (!team) throw new Error('Team not found');
+      return teamService.processJoinRequest(teamId, userId, status);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['team-members', teamId] });
+    },
+  });
+
+  const handleJoinRequestMutation = useMutation({
+    mutationFn: async ({ userId, status }: { userId: string; status: 'accepted' | 'rejected' }) => {
+      if (!team) throw new Error('Team not found');
+      if (!team?.data?.[0]?.id) throw new Error('Team ID not found');
+      return await teamService.processJoinRequest(team.data[0].id, userId, status);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['team-members', teamId] });
+    },
   });
 
   return {
     userTeams,
-    getTeam,
-    getTeamMembers,
+    team,
+    members,
+    isLoading: isTeamLoading || isMembersLoading,
     createTeam,
     updateTeam,
     addPlayer,
     updatePlayer,
     removePlayer,
-    joinTeamWithCode,
-    handleJoinRequest
+    joinTeam,
+    handleJoinRequest,
+    handleJoinRequestMutation,
   };
 };

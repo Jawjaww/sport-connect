@@ -4,7 +4,8 @@ import { TextInput, Button, Text, useTheme } from 'react-native-paper';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useAuth } from '../../contexts/AuthContext';
-import type { AuthStackScreenProps } from '../../types/navigation';
+import { AuthUser, AuthStackParamList } from '../../types/sharedTypes';
+import { AuthStackScreenProps } from '../../types/navigationTypes';
 
 type Props = AuthStackScreenProps<'Login'>;
 
@@ -28,7 +29,7 @@ export default function LoginScreen({ navigation }: Props) {
       if (signInError) throw signInError;
 
       console.log('LoginScreen - Login successful, navigating to Home');
-      // Redirection vers l'écran principal
+      // Redirect to main screen
       navigation.dispatch(
         CommonActions.reset({
           index: 0,

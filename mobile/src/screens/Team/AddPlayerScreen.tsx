@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { Button, Card, TextInput, Text, useTheme, HelperText } from 'react-native-paper';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { TeamStackParamList } from '../../types/navigation';
+import { TeamStackParamList } from '../../types/navigationTypes';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../services/supabase';
-import { PlayerProfile } from '../../types';
+import { Player } from '../../types/sharedTypes';
 
 type Props = NativeStackScreenProps<TeamStackParamList, 'AddPlayer'>;
 
@@ -13,7 +13,7 @@ export default function AddPlayerScreen({ navigation }: Props) {
   const theme = useTheme();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedPlayer, setSelectedPlayer] = useState<PlayerProfile | null>(null);
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
 
   // Recherche de joueurs
   const { data: searchResults, isLoading } = useQuery({
@@ -29,7 +29,7 @@ export default function AddPlayerScreen({ navigation }: Props) {
         .limit(10);
 
       if (error) throw error;
-      return data as PlayerProfile[];
+      return data as Player[];
     },
     enabled: searchQuery.length > 2,
   });

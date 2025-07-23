@@ -1,136 +1,93 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  View, 
-  StyleSheet, 
-  RefreshControl,
-  TouchableOpacity,
-  Dimensions 
-} from 'react-native';
-import { 
-  Text, 
-  FAB, 
-  Card, 
-  Chip, 
-  Avatar,
-  Surface,
-  useTheme,
-  Menu,
-  Button
-} from 'react-native-paper';
-import { LinearGradient } from 'expo-linear-gradient';
+import { View, StyleSheet, Alert, RefreshControl } from 'react-native';
+import { TouchableOpacity } from 'react-native-gesture-handler';
+import { Text, FAB, Surface, Menu, useTheme } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
-import { MaterialIcons, Ionicons } from '@expo/vector-icons';
+import { RootStackParamList } from '../types/navigationTypes';
+import { MaterialIcons } from '@expo/vector-icons';
 import { FlashList } from "@shopify/flash-list";
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as Clipboard from 'expo-clipboard';
 import * as Sharing from 'expo-sharing';
-import { Alert } from 'react-native';
+import { teamService } from '../services/team.service';
 
-import { getLocalTeams, deleteTeam, regenerateTeamCode, shareTeamCodeByTeamId } from '../services/team.service';
 import { useAuth } from '../contexts/AuthContext';
-import type { Team } from '../types/database';
-import type { RootStackParamList } from '../types/navigation';
-import { confirmAlert } from '../utils/alertUtils';
-import { supabase } from '../services/supabase';
+import { Team } from '../types/sharedTypes';
+import { useTeams } from '../hooks/useTeams';
 
-const { width } = Dimensions.get('window');
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-const TeamCard: React.FC<{ team: Team, onTeamUpdate: () => void }> = ({ team, onTeamUpdate }) => {
-  const [isMenuVisible, setIsMenuVisible] = useState(false);
-  const [teamCode, setTeamCode] = useState(team.team_code ?? '');
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+interface TeamCardProps {
+  team: Team;
+  onTeamUpdate: () => void;
+}
+
+const TeamCard: React.FC<TeamCardProps> = ({ team, onTeamUpdate }) => {
+  const navigation = useNavigation<NavigationProp>();
   const { supabase } = useAuth();
+  const theme = useTheme();
+  const [teamCode, setTeamCode] = useState<string | null>(team.team_code || null);
+  const [isMenuVisible, setIsMenuVisible] = useState(false);
 
   const handleRegenerateCode = async () => {
     try {
-      console.log(`🔑 Tentative de régénération du code pour l'équipe: ${team.name} (ID: ${team.id})`);
-      
-      // Vérifier l'existence du code actuel
-      console.log(`🔍 Code actuel: ${teamCode}`);
-
-      const newCode = await regenerateTeamCode(team.id);
-      
+      const { data: newCode, error } = await teamService.regenerateTeamCode(team.id);
+      if (error) throw error;
       if (newCode) {
-        console.log(`✅ Nouveau code généré: ${newCode}`);
-        
-        // Vérifier que le nouveau code est différent de l'ancien
-        if (newCode === teamCode) {
-          console.warn('⚠️ Le nouveau code est identique à l\'ancien');
-        }
-        
-        // Mettre à jour l'état local du code
         setTeamCode(newCode);
-        
-        // Afficher une alerte avec le nouveau code
-        Alert.alert(
-          'Code régénéré', 
-          `Nouveau code : ${newCode}`, 
-          [{ text: 'OK', onPress: () => console.log('Alerte de code confirmée') }]
-        );
-        
-        // Mettre à jour la liste des équipes
+        Alert.alert('Code régénéré', `Nouveau code : ${newCode}`);
         onTeamUpdate();
-      } else {
-        console.error('❌ Échec de la génération du nouveau code');
-        Alert.alert(
-          'Erreur', 
-          'Impossible de régénérer le code', 
-          [{ text: 'OK', onPress: () => console.log('Alerte d\'erreur confirmée') }]
-        );
       }
-      
-      // Fermer le menu
       setIsMenuVisible(false);
     } catch (error) {
-      console.error('❌ Erreur complète de régénération de code', error);
-      
-      Alert.alert(
-        'Erreur', 
-        'Une erreur inattendue est survenue lors de la régénération du code', 
-        [{ text: 'OK', onPress: () => console.log('Alerte d\'erreur inattendue confirmée') }]
-      );
+      Alert.alert('Erreur', 'Une erreur est survenue lors de la régénération du code');
     }
   };
 
   const handleShareCode = async () => {
+    if (!teamCode) {
+      Alert.alert('Erreur', 'Aucun code d\'équipe disponible');
+      return;
+    }
+
     try {
-      await shareTeamCodeByTeamId(team.id);
-      setIsMenuVisible(false);
+      const { teamCode: code, shareLink } = await teamService.shareTeamCode(team.id);
+      if (code && shareLink) {
+        await Sharing.shareAsync(shareLink, {
+          dialogTitle: 'Partager le code d\'équipe',
+        });
+      }
     } catch (error) {
-      console.error('Erreur de partage', error);
-      Alert.alert('Erreur', 'Impossible de partager le code');
+      Alert.alert('Erreur', 'Une erreur est survenue lors du partage du code');
     }
   };
 
   const handleDeleteTeam = async () => {
-    try {
-      const confirmed = await new Promise((resolve) => {
-        Alert.alert(
-          'Supprimer l\'équipe',
-          `Voulez-vous vraiment supprimer l'équipe ${team.name} ?`,
-          [
-            { text: 'Annuler', onPress: () => resolve(false), style: 'cancel' },
-            { text: 'Supprimer', onPress: () => resolve(true), style: 'destructive' }
-          ]
-        );
-      });
-
-      if (confirmed) {
-        const result = await deleteTeam(team.id);
-        if (result) {
-          Alert.alert('Équipe supprimée', `${team.name} a été supprimée avec succès`);
-          onTeamUpdate(); // Mettre à jour la liste des équipes
-        }
-        setIsMenuVisible(false);
-      }
-    } catch (error) {
-      console.error('Erreur de suppression', error);
-      Alert.alert('Erreur', 'Impossible de supprimer l\'équipe');
-    }
+    Alert.alert(
+      'Supprimer l\'équipe',
+      `Voulez-vous vraiment supprimer l'équipe ${team.name} ?`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer',
+          onPress: async () => {
+            try {
+              const { error } = await teamService.deleteTeam(team.id);
+              if (error) throw error;
+              Alert.alert('Succès', `${team.name} a été supprimée`);
+              onTeamUpdate();
+            } catch (error) {
+              Alert.alert('Erreur', 'Impossible de supprimer l\'équipe');
+            }
+          },
+          style: 'destructive',
+        },
+      ],
+    );
   };
 
   const handleManageMembers = () => {
-    navigation.navigate('TeamMembers', { teamId: team.id });
+    navigation.navigate('TeamMembers', { teamId: String(team.id) });
     setIsMenuVisible(false);
   };
 
@@ -193,20 +150,33 @@ const TeamCard: React.FC<{ team: Team, onTeamUpdate: () => void }> = ({ team, on
 };
 
 const ManagedTeamsScreen: React.FC = () => {
-  const [teams, setTeams] = useState<Team[]>([]);
+  const { teams, error, isLoading, setTeams } = useTeams();
   const [refreshing, setRefreshing] = useState(false);
   const { user } = useAuth();
+  const navigation = useNavigation<NavigationProp>();
+
+  const filteredTeams = teams.filter(team => team.team_code);
 
   const loadTeams = useCallback(async () => {
     setRefreshing(true);
     try {
-      const fetchedTeams = await getLocalTeams();
+      const { data: fetchedTeams, error } = await teamService.getAllTeams();
+      if (error) {
+        console.error('Erreur lors de la récupération des équipes:', error);
+        Alert.alert('Erreur', 'Une erreur est survenue lors du chargement des équipes.');
+        return;
+      }
+      if (!fetchedTeams) {
+        console.error('Aucune équipe trouvée');
+        return;
+      }
       const managedTeams = fetchedTeams.filter((team: Team) => 
         team.owner_id === user?.id || team.owner_id === null
       );
       setTeams(managedTeams);
     } catch (error) {
       console.error('Erreur lors du chargement des équipes:', error);
+      Alert.alert('Erreur', 'Une erreur est survenue lors du chargement des équipes.');
     } finally {
       setRefreshing(false);
     }
@@ -220,10 +190,62 @@ const ManagedTeamsScreen: React.FC = () => {
     <TeamCard team={item} onTeamUpdate={loadTeams} />
   ), [loadTeams]);
 
+  const handleDeleteTeam = async (teamId: string) => {
+    try {
+      const { error } = await teamService.deleteTeam(teamId);
+      if (error) throw error;
+      setTeams((prevTeams: Team[]) => prevTeams.filter(team => team.id !== teamId));
+      Alert.alert('Équipe supprimée', 'L\'équipe a été supprimée avec succès');
+    } catch (error) {
+      console.error('Erreur de suppression', error);
+      Alert.alert('Erreur', 'Impossible de supprimer l\'équipe');
+    }
+  };
+
+  const handleRegenerateCode = async (teamId: string): Promise<void> => {
+    try {
+      const team = teams.find((t: Team) => t.id === teamId);
+      if (!team) {
+        throw new Error('Team not found');
+      }
+      
+      const { data: newCode, error } = await teamService.regenerateTeamCode(teamId);
+      if (error) throw error;
+      if (newCode) {
+        setTeams((prevTeams: Team[]) => 
+          prevTeams.map((team: Team) => 
+            team.id === teamId 
+              ? { ...team, team_code: newCode } 
+              : team
+          )
+        );
+        
+        Alert.alert('Code régénéré', `Nouveau code : ${newCode}`);
+      }
+    } catch (error: any) {
+      console.error('Erreur de régénération de code', error);
+      Alert.alert('Erreur', 'Impossible de régénérer le code');
+    }
+  };
+
+  const handleAddTeam = (prevTeams: Team[], team: Team) => {
+    setTeams([...prevTeams, team]);
+  };
+
+  const [filterText, setFilterText] = useState('');
+  const [filteredTeamsState, setFilteredTeams] = useState<Team[]>([]);
+
+  const handleFilterTeams = () => {
+    if (Array.isArray(teams)) { 
+      const filteredTeams = teams.filter((team: Team) => team.name.includes(filterText));
+      setFilteredTeams(filteredTeams);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <FlashList
-        data={teams}
+        data={filteredTeamsState.length > 0 ? filteredTeamsState : filteredTeams}
         renderItem={renderTeamCard}
         keyExtractor={(item: Team) => item.id}
         ListEmptyComponent={
@@ -245,7 +267,7 @@ const ManagedTeamsScreen: React.FC = () => {
       <FAB
         icon="plus"
         style={styles.fab}
-        onPress={() => {}} // Aucune action pour le moment
+        onPress={() => navigation.navigate('CreateTeam')}
         label="Créer une équipe"
       />
     </View>

@@ -1,104 +1,46 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
-import { Card, Text, useTheme, Avatar } from 'react-native-paper';
-import { Match } from '../types';
-import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { View, Text, StyleSheet } from 'react-native';
+import { Card } from 'react-native-paper';
+import { Match } from '../types/sharedTypes';
+import { useTeams } from '../hooks/useTeams';
 
-interface MatchCardProps {
+export interface MatchCardProps {
   match: Match;
-  onPress?: () => void;
+  onPress: () => void;
 }
 
-const MatchCard: React.FC<MatchCardProps> = ({ match, onPress }) => {
-  const theme = useTheme();
-
-  const getStatusColor = (status: Match['status']) => {
-    switch (status) {
-      case 'in_progress':
-        return theme.colors.primary;
-      case 'completed':
-        return theme.colors.secondary;
-      case 'cancelled':
-        return theme.colors.error;
-      default:
-        return theme.colors.outline;
-    }
-  };
-
-  const getStatusText = (status: Match['status']) => {
-    switch (status) {
-      case 'in_progress':
-        return 'En cours';
-      case 'completed':
-        return 'Terminé';
-      case 'cancelled':
-        return 'Annulé';
-      default:
-        return 'À venir';
-    }
-  };
+export const MatchCard: React.FC<MatchCardProps> = ({ match, onPress }) => {
+  const { teams } = useTeams();
+  const teamA = teams?.find(team => team.id === match.teamAId);
+  const teamB = teams?.find(team => team.id === match.teamBId);
 
   return (
     <Card style={styles.card} onPress={onPress}>
       <Card.Content>
-        <View style={styles.header}>
-          <Text variant="labelSmall" style={{ color: getStatusColor(match.status) }}>
-            {getStatusText(match.status)}
-          </Text>
-          <Text variant="labelSmall">
-            {format(new Date(match.date), 'dd MMMM yyyy - HH:mm', { locale: fr })}
-          </Text>
-        </View>
-
         <View style={styles.teamsContainer}>
           <View style={styles.teamContainer}>
-            <Avatar.Image
-              size={40}
-              source={
-                match.home_team.logo_url
-                  ? { uri: match.home_team.logo_url }
-                  : { uri: 'https://via.placeholder.com/50x50.png?text=Team' }
-              }
-            />
-            <Text variant="titleMedium" style={styles.teamName}>
-              {match.home_team.name}
-            </Text>
+            <View style={styles.teamInfo}>
+              <Text style={styles.teamName}>{teamA?.name}</Text>
+              <Text style={styles.teamLocation}>{teamA?.location || ''}</Text>
+            </View>
+            <View style={styles.scoreContainer}>
+              <Text style={styles.score}>{match.scoreA !== undefined ? match.scoreA : '-'}</Text>
+            </View>
           </View>
 
-          {match.score ? (
-            <View style={styles.scoreContainer}>
-              <Text variant="headlineMedium">{match.score.home}</Text>
-              <Text variant="titleLarge" style={styles.scoreSeparator}>
-                -
-              </Text>
-              <Text variant="headlineMedium">{match.score.away}</Text>
-            </View>
-          ) : (
-            <Text variant="titleLarge" style={styles.vs}>
-              VS
-            </Text>
-          )}
-
           <View style={styles.teamContainer}>
-            <Avatar.Image
-              size={40}
-              source={
-                match.away_team.logo_url
-                  ? { uri: match.away_team.logo_url }
-                  : { uri: 'https://via.placeholder.com/50x50.png?text=Team' }
-              }
-            />
-            <Text variant="titleMedium" style={styles.teamName}>
-              {match.away_team.name}
-            </Text>
+            <View style={styles.teamInfo}>
+              <Text style={styles.teamName}>{teamB?.name}</Text>
+              <Text style={styles.teamLocation}>{teamB?.location || ''}</Text>
+            </View>
+            <View style={styles.scoreContainer}>
+              <Text style={styles.score}>{match.scoreB !== undefined ? match.scoreB : '-'}</Text>
+            </View>
           </View>
         </View>
 
         <View style={styles.footer}>
-          <Text variant="labelSmall" style={styles.location}>
-            {match.venue}
-          </Text>
+          <Text style={styles.date}>{new Date(match.date).toLocaleDateString()}</Text>
         </View>
       </Card.Content>
     </Card>
@@ -110,43 +52,43 @@ const styles = StyleSheet.create({
     marginVertical: 8,
     marginHorizontal: 16,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
   teamsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
   },
   teamContainer: {
     flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 8,
+  },
+  teamInfo: {
+    flex: 1,
   },
   teamName: {
-    marginTop: 8,
-    textAlign: 'center',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  teamLocation: {
+    fontSize: 14,
+    color: '#666',
   },
   scoreContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 16,
+    marginLeft: 16,
   },
-  scoreSeparator: {
-    marginHorizontal: 8,
-  },
-  vs: {
-    marginHorizontal: 16,
+  score: {
+    fontSize: 24,
+    fontWeight: 'bold',
   },
   footer: {
+    marginTop: 8,
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
   },
-  location: {
-    opacity: 0.7,
+  date: {
+    fontSize: 14,
+    color: '#666',
   },
 });
-
-export default MatchCard;
